@@ -17,18 +17,35 @@ const PORT = Number(process.env.LAN_PORT || 13001);
 const SLOTS = 2; // slot 0 = red (P1), slot 1 = blue (P2)
 const HOST_GRACE_MS = 25000; // keep room alive across lobby -> match navigation
 
-// lanIP: first non-internal IPv4 — what the phone types / the QR encodes.
+// lanIP: best-guess LAN IPv4 for the phone to reach — what the QR encodes.
+//
+// Heuristic (avoids the common trap of advertising a VM/virtual-switch address
+// the phone can't route to): weight real Wi-Fi/home ranges above the
+// 172.16/12 block, which Docker / Hyper-V / WSL virtually always occupy.
+//   - 192.168.*            -> weight 3  (home Wi-Fi, strongest)
+//   - 10.*                 -> weight 2  (private)
+//   - 172.16-31.*          -> weight 1  (Docker/VM — weakest)
+//   - anything else        -> skipped
+// Higher weight wins; ties keep interface iteration order. Set LAN_IP to force
+// a specific address (handy if auto-detection ever picks a wrong adapter).
 function lanIP() {
+  if (process.env.LAN_IP) return process.env.LAN_IP;
   const ifaces = os.networkInterfaces();
-  const prefer = []; // 192.168.* / 10.* first, then anything else
+  const cands = [];
   for (const name of Object.keys(ifaces)) {
     for (const ni of ifaces[name] || []) {
       if (ni.family !== "IPv4" || ni.internal) continue;
-      if (/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ni.address)) prefer.unshift(ni.address);
-      else prefer.push(ni.address);
+      const a = ni.address;
+      let w = 0;
+      if (/^192\.168\./.test(a)) w = 3;
+      else if (/^10\./.test(a)) w = 2;
+      else if (/^172\.(1[6-9]|2\d|3[01])\./.test(a)) w = 1;
+      if (w) cands.push({ ip: a, w });
     }
   }
-  return prefer[0] || "127.0.0.1";
+  if (!cands.length) return "127.0.0.1";
+  cands.sort((x, y) => y.w - x.w); // highest weight first (stable within weight)
+  return cands[0].ip;
 }
 
 // rooms: code -> { host, pads:Map<padId,{ws,name,slot,ready}>, graceTimer }

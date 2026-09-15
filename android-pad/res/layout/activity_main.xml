@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0b0e14">
+
+    <LinearLayout
+        android:id="@+id/connectCard"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textColor="#ffffff"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="电脑运行主屏，手机连同一 Wi-Fi 当手柄"
+            android:textColor="#9aa4b2"
+            android:textSize="13sp"
+            android:layout_marginBottom="28dp" />
+
+        <EditText
+            android:id="@+id/hostInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="电脑IP，如 192.168.1.50"
+            android:textColor="#ffffff"
+            android:textColorHint="#5b6472"
+            android:inputType="textUri"
+            android:background="#1a2230"
+            android:padding="14dp"
+            android:layout_marginBottom="12dp" />
+
+        <EditText
+            android:id="@+id/roomInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="房间号（电脑主屏二维码上的 4 位）"
+            android:textColor="#ffffff"
+            android:textColorHint="#5b6472"
+            android:inputType="textCapCharacters"
+            android:background="#1a2230"
+            android:padding="14dp"
+            android:layout_marginBottom="20dp" />
+
+        <Button
+            android:id="@+id/connectBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="连接手柄"
+            android:textColor="#ffffff"
+            android:textSize="16sp"
+            android:background="#3b82f6"
+            android:padding="14dp" />
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#f87171"
+            android:textSize="13sp"
+            android:layout_marginTop="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="提示：也可直接填完整地址，如 http://192.168.1.50:13000/pad?room=AB12"
+            android:textColor="#5b6472"
+            android:textSize="12sp"
+            android:layout_marginTop="24dp" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/webContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+</FrameLayout>

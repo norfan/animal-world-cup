@@ -11,5 +11,6 @@ export const metadata = {
 export default async function PadPage({ searchParams }) {
   const sp = await searchParams;
   const room = ((sp && sp.room) || "").toString().toUpperCase();
-  return <PadClient room={room} />;
+  const apk = ((sp && sp.apk) || "").toString();
+  return <PadClient room={room} apk={apk} />;
 }

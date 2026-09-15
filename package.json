@@ -7,6 +7,7 @@
     "dev": "rm -rf .next && next dev -p 13000",
     "lan": "node script/lan-server.mjs",
     "dev:lan": "rm -rf .next && node script/lan-dev.mjs",
+    "dev:lan:safe": "node script/lan-dev.mjs",
     "online": "node script/online-server.mjs",
     "dev:online": "rm -rf .next && node script/online-dev.mjs",
     "test:online": "node script/verify-online-relay.mjs",

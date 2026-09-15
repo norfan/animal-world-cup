@@ -89,6 +89,33 @@
 }
 .lb-hint { margin: 10px 0 0; font-size: 12.5px; opacity: 0.62; }
 
+/* "scan to download the app" block under the join QR — a second, smaller QR so
+   a phone can grab the controller APK straight from the big screen. */
+.lb-apk {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.2);
+  text-align: left;
+}
+.lb-apk-qr {
+  width: 96px;
+  height: 96px;
+  flex: 0 0 auto;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.lb-apk-qr img { width: 100%; height: 100%; display: block; }
+.lb-apk-meta { flex: 1 1 auto; min-width: 0; }
+.lb-apk-meta b { display: block; font-size: 15px; margin-bottom: 2px; }
+.lb-apk-meta span { display: block; font-size: 12px; opacity: 0.7; margin-bottom: 6px; }
+.lb-apk-meta .lb-url { font-size: 11px; opacity: 0.75; }
+
 /* slots card */
 .lb-slots { display: flex; flex-direction: column; }
 .lb-slot {

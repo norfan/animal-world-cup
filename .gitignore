@@ -68,3 +68,10 @@ match-runtime-source/
 match-runtime-assets-source/
 script/build-match-runtime.mjs
 script/build-match-runtime-assets.mjs
+
+# Android APK build artifacts + signing key — NEVER ship the keystore to git.
+/android-pad/build/
+android-pad/*.apk
+
+# WorkBuddy local project memory/state (not source)
+/.workbuddy/

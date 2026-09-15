@@ -32,6 +32,8 @@ export default function LobbyClient({ red, blue, side, ai, time }) {
   const [room, setRoom] = useState(null);
   const [join, setJoin] = useState(null); // full http URL the phone opens
   const [qr, setQr] = useState(null); // data URL
+  const [apkQr, setApkQr] = useState(null); // data URL for the app-download QR
+  const [apkUrl, setApkUrl] = useState(null); // full http URL to /download-apk
   const [pads, setPads] = useState([]); // [{padId,name,slot,ready}]
   const lanRef = useRef(null);
 
@@ -45,6 +47,13 @@ export default function LobbyClient({ red, blue, side, ai, time }) {
           QRCode.toDataURL(url, { margin: 1, width: 320, color: { dark: "#1d3d16", light: "#ffffff" } })
             .then(setQr)
             .catch(() => setQr(null));
+          // A second QR lets a phone download the controller app straight from
+          // the big screen — no need to hunt for the button inside /pad.
+          const apk = `http://${msg.ip}:${msg.port}/download-apk`;
+          setApkUrl(apk);
+          QRCode.toDataURL(apk, { margin: 1, width: 160, color: { dark: "#1d3d16", light: "#ffffff" } })
+            .then(setApkQr)
+            .catch(() => setApkQr(null));
         } else if (msg.t === "roster") {
           setPads(msg.pads || []);
         }
@@ -92,6 +101,17 @@ export default function LobbyClient({ red, blue, side, ai, time }) {
             </div>
             {join ? <code className="lb-url">{join}</code> : null}
             <p className="lb-hint">{t("lan.hint")}</p>
+
+            <div className="lb-apk">
+              <div className="lb-apk-qr">
+                {apkQr ? <img src={apkQr} alt="download app QR" /> : <div className="lb-qr-wait" />}
+              </div>
+              <div className="lb-apk-meta">
+                <b>扫码下载手机手柄 App</b>
+                <span>Scan to download the controller app (APK)</span>
+                {apkUrl ? <code className="lb-url">{apkUrl}</code> : null}
+              </div>
+            </div>
           </section>
 
           {/* right: who's in */}
