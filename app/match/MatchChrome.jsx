@@ -11,7 +11,7 @@ import GoalFx from "./GoalFx";
 import { StatsBars, readStats } from "./StatsPanel";
 import { captureMatch } from "./captureMatch";
 import { sfx } from "../audio/SoundBank";
-import { IconCamera, IconCheck, IconSoundOn, IconSoundOff, IconZoomIn, IconZoomOut, IconReplay, IconHome } from "../ui/Icons";
+import { IconCamera, IconCheck, IconSoundOn, IconSoundOff, IconZoomIn, IconZoomOut, IconReplay, IconHome, IconTag } from "../ui/Icons";
 
 function navigateHome() {
   window.location.href = "/";
@@ -106,12 +106,40 @@ function MatchControls({ result, onShot, shot }) {
 
   const { t } = useLocale();
 
+  // LAN seats: the label toggle only makes sense while phones are on the pitch,
+  // and the preference itself lives in the engine layer (window.__acLabels), so
+  // poll it instead of duplicating the source of truth in React state.
+  const [seatCount, setSeatCount] = useState(0);
+  const [labelsOn, setLabelsOn] = useState(true);
+  useEffect(() => {
+    const read = () => {
+      setSeatCount(window.__acPads ? window.__acPads.length : 0);
+      if (window.__acLabels) setLabelsOn(!!window.__acLabels.isOn());
+    };
+    read();
+    const id = window.setInterval(read, 800);
+    return () => window.clearInterval(id);
+  }, []);
+  function toggleLabels() {
+    if (!window.__acLabels) return;
+    setLabelsOn(!!window.__acLabels.toggle());
+    sfx.play("ui_click");
+  }
+
   return (
     <div className="match-controls">
       {!result ? (
         <>
           <button className="glass-btn" data-tip={t("match.ctrl.zoomIn")} onClick={z("step", 1.18)}><IconZoomIn /></button>
           <button className="glass-btn" data-tip={t("match.ctrl.zoomOut")} onClick={z("step", 1 / 1.18)}><IconZoomOut /></button>
+
+          {seatCount > 0 ? (
+            <button type="button" className="glass-btn" aria-pressed={labelsOn}
+                    data-tip={t(labelsOn ? "match.ctrl.labelsHide" : "match.ctrl.labelsShow")}
+                    onClick={toggleLabels}>
+              <IconTag />
+            </button>
+          ) : null}
 
           <button type="button" className="glass-btn" data-tip={t("match.ctrl.screenshot")} onClick={onShot} disabled={shot === "busy"}>
             {shot === "done" ? <IconCheck /> : <IconCamera />}

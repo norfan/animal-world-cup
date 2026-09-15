@@ -107,3 +107,13 @@ export function IconGlobe(p) {
     </Svg>
   );
 }
+
+// name tag — "player labels" toggle in the LAN match HUD
+export function IconTag(p) {
+  return (
+    <Svg {...p}>
+      <path d="M11.4 3H20a1 1 0 0 1 1 1v8.6a2 2 0 0 1-.59 1.42l-6.4 6.4a2 2 0 0 1-2.82 0l-6-6a2 2 0 0 1 0-2.82l6.4-6.4A2 2 0 0 1 11.4 3Z" />
+      <circle cx="16.4" cy="7.6" r="1.5" />
+    </Svg>
+  );
+}

@@ -340,3 +340,85 @@
   0%, 100% { transform: rotate(0deg); }
   50% { transform: rotate(90deg); }
 }
+
+/* ---------------------------------------------------------------------------
+   Seat badge + number picker (4v4 seat model).
+   The badge replaces the old P1/P2 slot chip: it is the phone's permanent
+   binding — "红队 5 号" — painted in the same colour the big screen puts above
+   that player's head, so the two screens agree at a glance.
+   --------------------------------------------------------------------------- */
+.pad-seat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 13px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  transition: transform 120ms ease;
+}
+.pad-seat:disabled { cursor: default; opacity: 0.85; }
+.pad-seat:not(:disabled):active { transform: scale(0.95); }
+.pad-seat b { font-size: 15px; font-weight: 800; letter-spacing: 0.04em; }
+.pad-seat em { font-size: 15px; font-style: normal; font-weight: 900; }
+
+.pad-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 14, 10, 0.72);
+  backdrop-filter: blur(3px);
+}
+.pad-picker-card {
+  width: min(88vw, 430px);
+  max-height: 92vh;
+  overflow: auto;
+  padding: 15px 18px 14px;
+  border-radius: 20px;
+  background: #fffef8;
+  color: #1f2a1c;
+  text-align: center;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+}
+.pad-picker-title { display: block; font-size: 17px; font-weight: 800; }
+.pad-picker-sub { display: block; margin-top: 2px; font-size: 11px; color: #6b7a66; }
+.pad-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+.pad-pick {
+  display: grid;
+  gap: 1px;
+  padding: 7px 4px;
+  border: 2px solid rgba(120, 90, 50, 0.22);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1f2a1c;
+  font: inherit;
+  cursor: pointer;
+}
+.pad-pick b { font-size: 20px; font-weight: 900; }
+.pad-pick i { font-size: 9.5px; font-style: normal; color: #6b7a66; }
+.pad-pick.is-mine { border-color: #2f7d32; background: #eaf7ea; }
+.pad-pick.is-taken,
+.pad-pick.is-gk { background: #f1efe6; opacity: 0.45; cursor: not-allowed; }
+.pad-pick:disabled { cursor: not-allowed; }
+.pad-picker-err { margin: 4px 0 0; font-size: 12px; font-weight: 700; color: #c0392b; }
+.pad-picker-note { margin: 6px 0 10px; font-size: 11px; color: #6b7a66; }
+.pad-picker-close {
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: #2f7d32;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}

@@ -16,7 +16,11 @@ export const LAN_PORT = 13001;
 export function lanWsUrl() {
   if (typeof window === "undefined") return null;
   const host = window.location.hostname || "127.0.0.1";
-  return `ws://${host}:${LAN_PORT}`;
+  // `window.__lanPort` is a test seam: the browser tests point a page served by
+  // the normal dev server at a scratch relay on their own port, so they never
+  // have to restart (or disturb) the relay the user is actually running.
+  const port = Number(window.__lanPort) || LAN_PORT;
+  return `ws://${host}:${port}`;
 }
 
 export function createLanClient({ onMessage, onOpen, onClose } = {}) {

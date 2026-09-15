@@ -16,7 +16,17 @@
     "prebuild": "rm -rf .next",
     "build": "node script/stamp-sw-version.mjs && node script/safe-build.mjs",
     "build:worker": "rm -rf .next .open-next && node script/stamp-sw-version.mjs && opennextjs-cloudflare build",
-    "start": "next start -p 13000"
+    "start": "next start -p 13000",
+    "test:pads": "node script/verify-pad-driver.mjs",
+    "inspect:match": "node script/inspect-match-module.mjs",
+    "test:lan:seats": "node script/verify-lan-seats.mjs",
+    "test:lan:pad": "node script/verify-pad-seatpath.mjs",
+    "test:lan:labels": "node script/verify-pad-labels.mjs",
+    "test:lan:lobby": "node script/verify-pad-lobby.mjs",
+    "test:lan:e2e": "node script/lan-e2e.mjs",
+    "diag:lan:seats": "node script/diag-seat-errors.mjs",
+    "test:lan": "node script/verify-lan-seats.mjs && node script/verify-pad-seatpath.mjs && node script/verify-pad-labels.mjs && node script/verify-pad-lobby.mjs",
+    "test:lan:all": "node script/verify-lan-seats.mjs && node script/verify-pad-driver.mjs && node script/verify-pad-seatpath.mjs && node script/verify-pad-labels.mjs && node script/verify-pad-lobby.mjs && node script/lan-e2e.mjs"
   },
   "dependencies": {
     "next": "15.5.19",

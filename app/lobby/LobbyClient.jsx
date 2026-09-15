@@ -4,13 +4,16 @@
 // carrying ?red=&blue=&side=&ai= . It:
 //   1. connects to the relay as host -> gets a room code + the host LAN IP
 //   2. shows a QR + join URL + the code so phones can open /pad?room=XXXX
-//   3. shows the two player slots filling up as phones join
-//   4. on Start: tells the pads to begin, then navigates the big screen into
-//      /match?...&play=1&p2=1&lan=ROOM (the match page re-attaches as host).
+//   3. shows both squads as 7 numbered seats, filling in as phones join: a seat
+//      turns into a human the moment a pad claims it, and goes back to AI when
+//      that pad drops
+//   4. on Start: locks the line-up (a phone may still take a FREE seat, but
+//      nobody can change the number they were handed), tells the pads to begin,
+//      then navigates the big screen into /match?...&play=1&p2=1&lan=ROOM
 //
 // The relay room survives this lobby -> match navigation via the server's host
 // grace timer, so the phones stay connected straight through kickoff.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -34,7 +37,8 @@ export default function LobbyClient({ red, blue, side, ai, time }) {
   const [qr, setQr] = useState(null); // data URL
   const [apkQr, setApkQr] = useState(null); // data URL for the app-download QR
   const [apkUrl, setApkUrl] = useState(null); // full http URL to /download-apk
-  const [pads, setPads] = useState([]); // [{padId,name,slot,ready}]
+  const [pads, setPads] = useState([]); // [{padId,name,slot,ready,side,number,playerId,color}]
+  const [counts, setCounts] = useState(null); // { red:{humans,ai}, blue:{humans,ai} }
   const lanRef = useRef(null);
 
   useEffect(() => {
@@ -56,6 +60,7 @@ export default function LobbyClient({ red, blue, side, ai, time }) {
             .catch(() => setApkQr(null));
         } else if (msg.t === "roster") {
           setPads(msg.pads || []);
+          if (msg.counts) setCounts(msg.counts);
         }
       },
     });
@@ -65,12 +70,14 @@ export default function LobbyClient({ red, blue, side, ai, time }) {
     return () => lan.close();
   }, []);
 
-  const slot0 = useMemo(() => pads.find((p) => p.slot === 0), [pads]);
-  const slot1 = useMemo(() => pads.find((p) => p.slot === 1), [pads]);
-  const canStart = !!slot0; // P1 (red) must be a human for play mode
+  const redHumans = counts ? counts.red.humans : pads.filter((p) => p.side === "red").length;
+  const canStart = redHumans >= 1; // the red side needs at least one human to play
 
   function start() {
     if (!room || !canStart) return;
+    // Kick-off locks the line-up: after this a phone may still take a FREE seat,
+    // but nobody can change the number they were handed. `ended` unlocks again.
+    lanRef.current && lanRef.current.send({ t: "lock", locked: true });
     // tell the pads to switch to LIVE, then drive the big screen into the match;
     // the relay's host grace timer keeps the room (and the phones) alive across
     // this navigation. Formations are left to the engine's random roll.
@@ -114,12 +121,12 @@ export default function LobbyClient({ red, blue, side, ai, time }) {
             </div>
           </section>
 
-          {/* right: who's in */}
-          <section className="lb-card lb-slots">
+          {/* right: who's in — both squads, seat by seat */}
+          <section className="lb-card lb-squads">
             <h2 className="lb-h2">{t("lan.players")}</h2>
-            <Slot n={1} teamId={red} tone="red" pad={slot0} t={t} />
-            <Slot n={2} teamId={blue} tone="blue" pad={slot1} t={t} />
-            <p className="lb-note">{slot1 ? t("lan.note2p") : t("lan.note1p")}</p>
+            <TeamSeats teamId={red} tone="red" side="red" pads={pads} counts={counts} t={t} />
+            <TeamSeats teamId={blue} tone="blue" side="blue" pads={pads} counts={counts} t={t} />
+            <p className="lb-note">{redHumans ? t("lan.noteReady") : t("lan.noteNoRed")}</p>
           </section>
         </div>
 
@@ -136,19 +143,39 @@ export default function LobbyClient({ red, blue, side, ai, time }) {
   );
 }
 
-function Slot({ n, teamId, tone, pad, t }) {
-  const connected = !!pad;
+/** One side of the 7-seat board: GK is always AI, #2..#7 are human or AI. */
+function TeamSeats({ teamId, tone, side, pads, counts, t }) {
+  const mine = pads.filter((p) => p.side === side);
+  const byNumber = new Map(mine.map((p) => [p.number, p]));
+  const humans = counts && counts[side] ? counts[side].humans : mine.length;
+  const aiCount = counts && counts[side] ? counts[side].ai : 7 - humans;
   return (
-    <div className={`lb-slot lb-slot--${tone} ${connected ? "is-on" : ""}`}>
-      <span className="lb-slot-tag">{`P${n}`}</span>
-      <Portrait id={teamId} />
-      <div className="lb-slot-meta">
-        <b>{t(`team.${teamId}.name`)}</b>
-        <span className={`lb-slot-status ${connected ? "ok" : ""}`}>
-          {connected ? (pad.name || t("lan.connected")) : t("lan.waiting")}
-        </span>
+    <div className={`lb-team lb-team--${tone}`}>
+      <div className="lb-team-head">
+        <Portrait id={teamId} />
+        <div className="lb-team-meta">
+          <b>{t(`team.${teamId}.name`)}</b>
+          <span>{t("lan.humansAI").replace("{h}", String(humans)).replace("{a}", String(aiCount))}</span>
+        </div>
       </div>
-      <span className={`lb-dot ${connected ? "on" : ""}`} aria-hidden />
+      <div className="lb-seats">
+        {[1, 2, 3, 4, 5, 6, 7].map((n) => {
+          const pad = byNumber.get(n) || null;
+          const gk = n === 1;
+          const held = !!pad && pad.ready === false;
+          const cls = `lb-seat ${pad ? "is-human" : gk ? "is-gk" : "is-ai"} ${held ? "is-held" : ""}`;
+          const style = pad && typeof pad.color === "number"
+            ? { "--seat": `#${(pad.color >>> 0).toString(16).padStart(6, "0")}` }
+            : undefined;
+          return (
+            <span key={n} className={cls} style={style}
+                  title={pad ? `${pad.name || "Pad"} · ${n}` : `${n} · ${gk ? t("lan.gk") : "AI"}`}>
+              <b>{n}</b>
+              <i>{gk ? t("lan.gk") : pad ? (pad.name || "P").slice(0, 6) : "AI"}</i>
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }

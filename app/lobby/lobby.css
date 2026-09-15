@@ -116,49 +116,73 @@
 .lb-apk-meta span { display: block; font-size: 12px; opacity: 0.7; margin-bottom: 6px; }
 .lb-apk-meta .lb-url { font-size: 11px; opacity: 0.75; }
 
-/* slots card */
-.lb-slots { display: flex; flex-direction: column; }
-.lb-slot {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 14px;
+/* squads card — both sides as 7 numbered seats, seat by seat */
+.lb-squads { display: flex; flex-direction: column; gap: 12px; }
+.lb-team {
+  border-radius: 16px;
+  padding: 10px 11px 11px;
   background: rgba(255, 255, 255, 0.06);
-  border: 1.5px solid transparent;
-  margin-bottom: 12px;
-  transition: border-color 0.2s, background 0.2s;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
 }
-.lb-slot.is-on { background: rgba(255, 255, 255, 0.12); }
-.lb-slot--red.is-on { border-color: rgba(232, 76, 61, 0.9); }
-.lb-slot--blue.is-on { border-color: rgba(62, 126, 232, 0.95); }
-.lb-slot-tag {
-  font-weight: 800;
-  font-size: 14px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.35);
-}
-.lb-slot--red .lb-slot-tag { background: rgba(232, 76, 61, 0.92); }
-.lb-slot--blue .lb-slot-tag { background: rgba(62, 126, 232, 0.95); }
+.lb-team--red { border-color: rgba(232, 76, 61, 0.6); }
+.lb-team--blue { border-color: rgba(62, 126, 232, 0.6); }
+.lb-team-head { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.lb-team-meta { flex: 1 1 auto; text-align: left; min-width: 0; }
+.lb-team-meta b { display: block; font-size: 15px; line-height: 1.15; }
+.lb-team-meta span { font-size: 12px; opacity: 0.72; }
 .lb-pp {
-  width: 46px; height: 46px; border-radius: 50%;
+  width: 34px; height: 34px; border-radius: 50%;
   overflow: hidden; flex: 0 0 auto;
   background: rgba(255, 255, 255, 0.14);
   display: grid; place-items: center;
 }
 .lb-pp img { width: 100%; height: 100%; object-fit: cover; }
-.lb-slot-meta { flex: 1 1 auto; text-align: left; min-width: 0; }
-.lb-slot-meta b { display: block; font-size: 16px; }
-.lb-slot-status { font-size: 13px; opacity: 0.7; }
-.lb-slot-status.ok { color: #b6f0a8; opacity: 1; }
-.lb-dot {
-  width: 12px; height: 12px; border-radius: 50%;
-  background: rgba(255, 255, 255, 0.25);
-  flex: 0 0 auto;
+
+/* one cell per jersey number. The seat colour is a swatch + a rim, never the
+   fill, so the digit stays readable whatever colour the relay hands out. */
+.lb-seats { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.lb-seat {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  padding: 7px 2px 5px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.26);
+  border: 1.5px solid transparent;
+  transition: background 0.18s, border-color 0.18s;
 }
-.lb-dot.on { background: #6be05a; box-shadow: 0 0 10px #6be05a; }
-.lb-note { margin: 4px 0 0; font-size: 13px; opacity: 0.7; }
+.lb-seat b { font-size: 15px; line-height: 1; font-weight: 800; }
+.lb-seat i {
+  font-style: normal;
+  font-size: 9.5px;
+  line-height: 1.1;
+  opacity: 0.75;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-seat.is-ai { opacity: 0.45; }
+.lb-seat.is-gk { background: rgba(255, 210, 60, 0.14); border-color: rgba(255, 210, 60, 0.45); }
+.lb-seat.is-human {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: var(--seat, rgba(255, 255, 255, 0.6));
+  box-shadow: 0 0 12px -2px var(--seat, transparent);
+}
+.lb-seat.is-human::before {
+  content: "";
+  position: absolute;
+  top: 3px; right: 4px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--seat, #fff);
+  box-shadow: 0 0 7px var(--seat, transparent);
+}
+.lb-seat.is-human i { opacity: 0.92; }
+.lb-seat.is-held { border-style: dashed; }
+.lb-seat.is-held::before { opacity: 0.4; }
+.lb-note { margin: 2px 0 0; font-size: 13px; opacity: 0.7; }
 
 /* actions */
 .lb-actions { display: flex; justify-content: center; gap: 14px; margin-top: 24px; }

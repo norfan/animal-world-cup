@@ -77,3 +77,7 @@ script/build-match-runtime-assets.mjs
 
 # WorkBuddy local project memory/state (not source)
 /.workbuddy/
+
+# Scratch output from the headed-Chrome verification scripts (screenshots, JSON
+# reports). Regenerate with `pnpm test:pads`; never commit.
+/.scratch/

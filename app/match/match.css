@@ -126,6 +126,13 @@ body {
 .match-controls .lang-switcher__toggle:hover { transform: translateY(-2px); background: #ffffff; }
 .glass-btn:active { transform: scale(0.93); }
 .glass-btn:disabled { opacity: 0.55; cursor: wait; }
+/* toggles (e.g. player labels): dimmed + grey ink while switched off */
+.glass-btn[aria-pressed="false"] {
+  color: rgba(90, 100, 110, 0.75);
+  background: #f1efe6;
+  border-color: rgba(120, 110, 90, 0.24);
+}
+.glass-btn[aria-pressed="false"]:hover { background: #f7f6ef; }
 /* tooltip on hover — storybook style (cream card, green text) */
 .glass-btn[data-tip],
 .lang-switcher__toggle[data-tip] { position: relative; }
