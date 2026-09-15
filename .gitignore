@@ -69,9 +69,11 @@ match-runtime-assets-source/
 script/build-match-runtime.mjs
 script/build-match-runtime-assets.mjs
 
-# Android APK build artifacts + signing key — NEVER ship the keystore to git.
+# Android APK: build intermediates + signing key — NEVER ship the keystore to git.
+# NOTE: the prebuilt release APK `android-pad/animal-cup-pad.apk` IS committed on
+# purpose (~25 KB) — `/download-apk` serves it straight from a fresh clone, so
+# nobody has to rebuild it locally. Only build/ stays ignored.
 /android-pad/build/
-android-pad/*.apk
 
 # WorkBuddy local project memory/state (not source)
 /.workbuddy/
