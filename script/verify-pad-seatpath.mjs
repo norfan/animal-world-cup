@@ -662,9 +662,14 @@ try {
     report.reclaimMove,
   );
 
+  // "no internet right now" is not a defect: Chrome reports a failed remote
+  // font fetch (fonts.gstatic.com, for Baloo 2) as a console error. Without this
+  // the suite flakes intermittently on this box.
+  const OFFLINE_NOISE = /favicon|React DevTools|Download the|net::ERR_(SOCKET_NOT_CONNECTED|NAME_NOT_RESOLVED|INTERNET_DISCONNECTED|CONNECTION_REFUSED|CONNECTION_RESET|TIMED_OUT)|fonts\.(gstatic|googleapis)\.com/i;
+  const realPageErrors = pageErrors.filter((e) => !OFFLINE_NOISE.test(e));
   report.pageErrors = pageErrors;
   report.failedRequests = failedRequests;
-  eq("page errors", pageErrors.length, 0);
+  eq("page errors", realPageErrors.length, 0, realPageErrors.slice(0, 4));
 
   report.ok = failures.length === 0;
   report.checks = checks;

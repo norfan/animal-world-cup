@@ -261,6 +261,26 @@ export default function PadController({ room, transport = "lan", requestedSlot =
     onPointerCancel: () => { input.current[key] = false; },
   });
   const tap = (key) => ({ onPointerDown: (e) => { e.preventDefault(); sendTap(key); } });
+  // Shoot is a TAP: a touch fires one shot at maximum charge instead of needing
+  // a long press to "build up". We latch `shoot` true for a short fixed window
+  // (enough frames for the engine to register the shot) then auto-release, so a
+  // quick tap == one full-power shot. The actual max-power value is forced on the
+  // engine side (see standalone-match.js / match.rebuilt.js shoot transition).
+  const shootTapRef = useRef(null);
+  const tapShoot = () => {
+    if (statusRef.current !== "playing") return;
+    const i = input.current;
+    i.shoot = true;
+    lanRef.current && lanRef.current.send({ t: "input", seq: ++seqRef.current, d: { vx: i.vx, vy: i.vy, shoot: true, sprint: i.sprint } });
+    if (shootTapRef.current) clearTimeout(shootTapRef.current);
+    shootTapRef.current = window.setTimeout(() => {
+      i.shoot = false;
+      if (statusRef.current === "playing") {
+        lanRef.current && lanRef.current.send({ t: "input", seq: ++seqRef.current, d: { vx: i.vx, vy: i.vy, shoot: false, sprint: i.sprint } });
+      }
+    }, 160);
+  };
+  const shootBtnProps = { onPointerDown: (e) => { e.preventDefault(); tapShoot(); } };
 
   // The relay is the authority for the seat; `slot` survives only so this phone
   // keeps working against a relay that predates the seat protocol.
@@ -313,7 +333,7 @@ export default function PadController({ room, transport = "lan", requestedSlot =
         <button type="button" className="pad-btn pad-btn--lob" {...tap("lob")}><LobIcon /></button>
         <button type="button" className="pad-btn pad-btn--pass" {...tap("pass")}><PassIcon /></button>
         <button type="button" className="pad-btn pad-btn--tackle" {...tap("tackle")}><TackleIcon /></button>
-        <button type="button" className="pad-btn pad-btn--shoot" {...hold("shoot")}><ShootIcon /></button>
+        <button type="button" className="pad-btn pad-btn--shoot" {...shootBtnProps}><ShootIcon /></button>
         <button type="button" className="pad-btn pad-btn--sprint" {...hold("sprint")}><SprintIcon /></button>
       </div>
 

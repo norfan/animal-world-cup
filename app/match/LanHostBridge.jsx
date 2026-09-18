@@ -188,6 +188,7 @@ export default function LanHostBridge() {
     // Handy for the lobby's seat panel (P4) and for tests.
     window.__acLan = {
       room,
+      send: (msg) => lan.send(msg),
       lock: (locked) => lan.send({ t: "lock", locked: !!locked }),
       pick: (padId, number) => lan.send({ t: "pick", padId, number }),
       assign: (padId, side) => lan.send({ t: "assign", padId, side }),

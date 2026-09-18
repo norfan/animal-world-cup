@@ -483,7 +483,7 @@ try {
   // =======================================================================
   console.log("\n### page health");
   // =======================================================================
-  const noisy = pageErrors.filter((e) => !/favicon|Download the React DevTools|websocket/i.test(e));
+  const noisy = pageErrors.filter((e) => !/favicon|Download the React DevTools|websocket|net::ERR_(SOCKET_NOT_CONNECTED|NAME_NOT_RESOLVED|INTERNET_DISCONNECTED|CONNECTION_REFUSED|CONNECTION_RESET|TIMED_OUT)|fonts\.(gstatic|googleapis)\.com/i.test(e));
   // the /match page fetches the 811 KB bundle + assets; a dev-server 404 on a
   // probe asset is not a P4 regression, so only hard errors count
   const hard = noisy.filter((e) => /is not a function|is not defined|Cannot read|TypeError|ReferenceError/.test(e));

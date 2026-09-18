@@ -379,9 +379,5 @@ export default function OnlineMatchBridge() {
     };
   }, []);
 
-  return (
-    <div className={`online-match-badge online-match-badge--${connection}`}>
-      <i aria-hidden /> ONLINE
-    </div>
-  );
+  return null;
 }

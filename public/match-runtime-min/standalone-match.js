@@ -101,12 +101,30 @@ function acInstallLockGuard(users) {
   proto.takeControl = function (player, state, globalOverride) {
     if (this.locked && player !== this.lockedPlayer) return;
     if (player && player.user && player.user.locked && player.user !== this) return;
-    return origTake.call(this, player, state, globalOverride);
+    try {
+      return origTake.call(this, player, state, globalOverride);
+    } catch (e) {
+      // When a seat team is forced to run as AI (acMakeTeamAI), the engine's own
+      // team update occasionally tries to (re-)take control of a player that the
+      // locked seat user already owns. The engine throws "Cannot take control,
+      // player already controlled" — but the existing controller is exactly the
+      // one we want, so the conflict is benign. Swallow ONLY this specific error;
+      // re-throw anything else so real problems stay visible.
+      if (e && /already controlled/.test(String(e.message))) return this.player;
+      throw e;
+    }
   };
   proto.attachControl = function (player) {
     if (this.locked && player !== this.lockedPlayer) return;
     if (player && player.user && player.user.locked && player.user !== this) return;
-    return origAttach.call(this, player);
+    try {
+      return origAttach.call(this, player);
+    } catch (e) {
+      // belt-and-suspenders: swallow the same benign double-claim the engine
+      // raises from takeControl, in case a code path routes through attach.
+      if (e && /already controlled/.test(String(e.message))) return this.player;
+      throw e;
+    }
   };
 }
 
@@ -128,18 +146,43 @@ function acEnterPadsMode(users) {
   if (acPadsActive) return;
   acPadsActive = true;
   acInstallLockGuard(users);
-  // RequestHuman() only skips a user whose controller is disconnected, and the
-  // minted pad controllers all share one keyboard device, so the keyboard/P2
-  // users are detached rather than disabled.
   var list = users.list;
-  for (var i = 0; i < 2; i += 1) if (list[i] && list[i].controller) list[i].controller.connected = false;
+  for (var i = 0; i < 2; i += 1) {
+    var su = list[i];
+    if (!su) continue;
+    if (su.controller) su.controller.connected = false;
+    // CRITICAL — stop the ball carrier from being hijacked onto an input-less
+    // user and freezing.
+    //
+    // The engine auto-switches control of the ball winner to the nearest user:
+    //     team.closestUser(pos).takeControl(ballCarrier, Jt)   // match.rebuilt.js
+    //       @617117 (outfield trap) / @628450 (steal) / @616873 (GK trap)
+    // The minted SEAT users are already locked to their own player (acBindSeat),
+    // so a takeControl(ballCarrier) for a non-seat player is a silent no-op and
+    // the carrier falls through to its AI state — that half was already safe.
+    // But `closestUser` can also return the solo/P2 user (users.list[0]/[1]);
+    // those were only *disconnected*, not locked, so the engine WOULD hand the
+    // carrier to them, and with no device feeding input the carrier freezes
+    // ("AI 拿球走一会儿就卡死，断线后才动"). Locking them (lockedPlayer = null)
+    // makes EVERY user refuse a non-owned player, so the ball carrier always
+    // stays AI. Verified by script/verify-pad-seatpath.mjs (which only asserts
+    // the SEAT users' lock, so this extra lock does not regress it).
+    su.locked = true;
+    su.lockedPlayer = null;
+  }
 }
 
 function acExitPadsMode(users) {
   if (!acPadsActive) return;
   acPadsActive = false;
   var list = users.list;
-  for (var i = 0; i < 2; i += 1) if (list[i] && list[i].controller) list[i].controller.connected = true;
+  for (var i = 0; i < 2; i += 1) {
+    var su = list[i];
+    if (!su) continue;
+    if (su.controller) su.controller.connected = true;
+    su.locked = false;
+    su.lockedPlayer = null;
+  }
   for (var id in acPadsSeen) acReleasePad(acPadsSeen[id]);
   acPadsSeen = {};
 }
@@ -184,6 +227,13 @@ function acHoldPad(pad) {
 function acReleasePad(pad) {
   if (!pad || !pad.__user) return;
   acHoldPad(pad);
+  // a returning-to-AI player must clear the human tag so the pitch's
+  // allPlayersReady short-circuit (see acPatchReadiness) stops covering it.
+  if (pad.__player && pad.__player.__acHuman) {
+    try { pad.__player.__acHuman = false; } catch (e) {}
+    window.__acHumanCount = Math.max(0, (window.__acHumanCount || 1) - 1);
+    window.__acHumanSeated = window.__acHumanCount > 0;
+  }
   pad.__user = null;
 }
 
@@ -224,6 +274,17 @@ function acBindSeat(users, states, pglob, pitch, pad) {
     u.takeControl(player, states.HumanMove);
   }
   if (player.controller !== u.controller) player.controller = u.controller;
+  // tag the bound player so the pitch's allPlayersReady gate (which otherwise
+  // never sees a pad-driven human as "ready" and wedges dead-balls forever)
+  // can short-circuit and auto-resume play. Cleared in acReleasePad().
+  player.__acHuman = true;
+  window.__acHumanCount = (window.__acHumanCount || 0) + 1;
+  window.__acHumanSeated = window.__acHumanCount > 0;
+
+  // Req #2 root fix: a team carrying a fixed seat MUST run as AI so its 6 AI
+  // team-mates are actually driven (see acMakeTeamAI / acMatchTeamAI above).
+  acMakeTeamAI(team);
+  acMatchTeamAI(team, pitch);
 
   // (d) HumanGlobal is what grants human turn rate + pitch clamping in move()
   var want = player.isGoalkeeper ? pglob.HumanGoalkeeperGlobal : pglob.HumanGlobal;
@@ -309,6 +370,122 @@ function acMatchLive(pitch) {
   return name === "Match";
 }
 
+/* =====================================================================
+   Req #1 — dead-ball set-pieces wedge forever (throw-in / corner / goal-kick
+   / free-kick / penalty) when the taker is an AI player but the team carries a
+   *locked* human seat.
+
+   The engine's `RequestHuman` state tries to hand the set-piece to a team user:
+       else { var i = e.users[e.currentUser];
+              i.controller.connected ? i.takeControl(t, HumanState)
+                                     : t.states.time >= 1 && activateAI(t); }
+   Our seat binds the human to ONE fixed player and locks the User
+   (`u.locked = true; u.lockedPlayer = player`, in acBindSeat). The User's
+   takeControl guard `if (this.locked && t !== this.lockedPlayer) return;` then
+   blocks the reassignment — and because the seat controller still reports
+   `connected`, the engine NEVER reaches its `activateAI` fallback. The AI
+   teammate freezes in `ThrowInRequestHuman` / `CornerRequestHuman` / … for ever.
+
+   Fix: from the glue, detect any player sitting in a `*RequestHuman` state that
+   is NOT a human-seated player (`!player.__acHuman`) and, after the state has
+   been active ~1s (the same threshold the engine uses for its own fallback),
+   force the engine's own AI fallback — `RequestHuman.enter` stored it on the
+   state instance as `.state` (e.g. p.AIThrowIn). This mirrors `activateAI`
+   exactly, but fires because our lock would otherwise suppress it.
+
+   --- follow-up: the GOALKEEPER -------------------------------------------
+   The same family of bug sits one state further along, and it is the one the
+   user kept hitting ("守门员拿到球之后不发球，站着不动了"). When the keeper
+   traps the ball, `AIGoalkeeperGlobal.onTrap` queues
+
+       t.states.change(Wait, .25).queue(RequestHuman, AIGoalkeeperPutBallBackInPlay)
+
+   and `RequestHuman.update` again tries to hand it to a team user, this time as
+   `i.takeControl(t, HumanPutBallBackInPlay)`. Our lock makes that a no-op while
+   the seat controller still reports `connected`, so the engine's own AI
+   fallback is unreachable and the keeper holds the ball for ever.
+
+   Caught live by the watchdog in .scratch/observe-lan.mjs:
+       { id: 0, isGK: true, state: "RequestHuman", hasUser: false,
+         userLocked: false, hasController: false, teamIsAI: false, teamUsers: 1 }
+   — the taker owns no user and no controller, yet its team is NOT all-AI, so
+   the only branch left is "hand it to a locked user", which we blocked.
+
+   Two ways out, both built from the engine's own vocabulary:
+     * a `*RequestHuman` taker -> the AI state its `enter` stored on the
+       instance (`stt.state`), applied exactly like `activateAI()`
+       (`states.queued ? states.next() : states.change(stt.state)`);
+     * a `Human*` set-piece state sitting on a player NO phone owns -> its AI
+       twin from AC_HUMAN_TO_AI. `HumanPutBallBackInPlay` is the one that
+       matters: its own `update` has no AI fallback at all (it just waits for
+       the pass/lob button), so nothing but this can ever free it.
+   ===================================================================== */
+/* the engine's AI twin for each human-only set-piece state; keyed by NAME so a
+   rebuild of the bundle cannot silently merge two different constructors */
+var AC_HUMAN_TO_AI = {
+  HumanPutBallBackInPlay: "AIGoalkeeperPutBallBackInPlay",
+  HumanGoalKick: "AIGoalkeeperGoalKick",
+  HumanCornerKick: "AICornerKick",
+  HumanCornerAssist: "AICornerAssist",
+  HumanThrowIn: "AIThrowIn",
+};
+/* shorter than the engine's own 1 s `RequestHuman` threshold: nobody can press
+   the button for a player no phone owns, so waiting longer buys nothing */
+var AC_SETPIECE_GRACE = 0.6;
+/* bounded trail, surfaced by ?acdebug=1 — see AcViewDebug.jsx */
+var acStuckLog = [];
+function acStuckRecord(player, from, to, why) {
+  if (acStuckLog.length >= 24) return;
+  acStuckLog.push({ id: player.id, gk: !!player.isGoalkeeper, from: from, to: to, why: why });
+  window.__acStuck = acStuckLog; // surfaced by ?acdebug=1
+}
+function acUnstickSetPieces(pitch) {
+  if (!pitch) return;
+  var states = null;
+  try { states = runtime("players/states"); } catch (e) {}
+  if (!states) return;
+  var teams = [pitch.redTeam, pitch.blueTeam];
+  for (var ti = 0; ti < teams.length; ti += 1) {
+    var team = teams[ti];
+    if (!team || !team.players) continue;
+    for (var pi = 0; pi < team.players.length; pi += 1) {
+      var pl = team.players[pi];
+      if (!pl || !pl.states || !pl.states.current) continue;
+      // never steal a set-piece from a live seat: that player IS the human
+      if (pl.__acHuman) continue;
+      var stt = pl.states.current;
+      var nm = (stt.constructor && stt.constructor.name) || "";
+      var isReq = nm.indexOf("RequestHuman") >= 0;
+      var twin = isReq ? null : AC_HUMAN_TO_AI[nm];
+      if (!isReq && !twin) continue;
+      var age = pl.states.time;
+      if (typeof age === "number" && age < AC_SETPIECE_GRACE) continue;
+      var target = null;
+      var why = "";
+      if (isReq) {
+        // mirror RequestHuman.activateAI() exactly: a queued follower wins
+        if (pl.states.queued) {
+          try { pl.states.next(); acStuckRecord(pl, nm, "next()", "queued"); }
+          catch (e) { acStuckRecord(pl, nm, "-", "next:" + ((e && e.message) || e)); }
+          continue;
+        }
+        target = stt.state || (pl.isGoalkeeper ? states.AIGoalkeeperPutBallBackInPlay : states.AIDefend);
+        why = stt.state ? "taker-ai" : "taker-fallback";
+      } else {
+        target = states[twin];
+        why = "human-twin";
+      }
+      if (!target) continue;
+      // NOTE: `target` is the state CLASS (built by `new Function(...)` inside
+      // State.extend), so its `.constructor.name` is "Function". The class's own
+      // `.name` is the state name we want.
+      var toName = target.name || twin || "?";
+      try { pl.states.change(target); acStuckRecord(pl, nm, toName, why); }
+      catch (e) { acStuckRecord(pl, nm, "-", "change:" + ((e && e.message) || e)); }
+    }
+  }
+}
+
 function acSyncPads() {
   var pads = window.__acPads;
   var R = acPadsRuntime();
@@ -350,6 +527,9 @@ function acSyncPads() {
       if (!pad.__err) pad.__err = String((e && e.message) || e);
     }
   }
+  // Req #1: free any dead-ball set-piece whose taker is an AI player but the
+  // team carries a locked human seat (see acUnstickSetPieces).
+  if (live) acUnstickSetPieces(pitch);
   // seats that left the roster (phone gone past the hold window)
   for (var id in acPadsSeen) if (!seen[id]) acReleasePad(acPadsSeen[id]);
   acPadsSeen = seen;
@@ -394,6 +574,17 @@ function acSyncPads() {
 var AC_LABEL_KEY = "ac.playerLabels";
 var AC_LABEL_SQUAD = 7;
 var AC_AI_FILL = 0x39404d; // neutral slate: reads on grass and never competes with a seat colour
+/* Team capsule colours — user request: "将红队的头顶号码牌背景改为红色，蓝队
+   头顶号码牌背景改为蓝色，要暖色，不要纯红和纯蓝哦".
+   Deliberately NOT #ff0000 / #0000ff: both are softened and warmed. The red is
+   a brick/terracotta, the blue leans toward violet so it stops reading as a
+   cold primary. Both stay dark enough that the white numerals keep contrast
+   (see acInkOn) and distinct from each other at a glance from across a room. */
+var AC_RED_FILL = 0xd4674f;
+var AC_BLUE_FILL = 0x6076c9;
+function acTeamFill(side) {
+  return side === "blue" ? AC_BLUE_FILL : AC_RED_FILL;
+}
 var AC_LABEL_MIN_W = 26;
 var AC_LABEL_PAD_X = 7;
 var AC_LABEL_PAD_Y = 4;
@@ -401,7 +592,7 @@ var AC_LABEL_GAP = 1;
 var AC_LABEL_NUM_H = 27;
 var AC_LABEL_NICK_H = 16;
 var AC_LABEL_TIP = 7;
-var AC_LABEL_GAP_ABOVE_HEAD = 10;
+var AC_LABEL_GAP_ABOVE_HEAD = 40; // was 10; user asked for the name plate ~30px higher
 var AC_LABEL_FALLBACK_LIFT = 40; // only used if the RenderTexture readback fails
 var AC_LABEL_SAMPLE_TICKS = 60; // measure for ~1 s, then freeze the lift
 
@@ -644,7 +835,7 @@ function acBuildLabels() {
       layer.addChild(root);
       var it = { root: root, player: p, playerId: p.id, side: side, renderer: byId[p.id] || null, human: false, number: 0, nickName: "", fill: 0, ink: 0 };
       if (!it.renderer) missing += 1;
-      acPaintLabel(it, AC_AI_FILL, 0xffffff, "");
+      acPaintLabel(it, acTeamFill(side), 0xffffff, "");
       items.push(it);
     }
   }
@@ -689,8 +880,11 @@ function acSyncLabelHumans() {
     var seat = acSeatFor(it.side, it.playerId);
     var live = !!(seat && !seat.suspended);
     if (live) humans += 1;
-    var fill = live && typeof seat.color === "number" ? seat.color : AC_AI_FILL;
-    var ink = live ? acInkOn(fill) : 0xffffff;
+    // Capsule = the TEAM's warm colour, so red side / blue side reads instantly
+    // from across the room. What still marks "this one is a person" is the bright
+    // rim + nickname acPaintLabel adds for `human` items — not the fill.
+    var fill = acTeamFill(it.side);
+    var ink = acInkOn(fill);
     var nick = live ? seat.name || "" : "";
     if (fill !== it.fill || ink !== it.ink || nick !== it.nickName || live !== it.human) {
       it.human = live;
@@ -850,18 +1044,410 @@ window.__acLabels = {
   rebuild: function () { acLabelOwner = null; acLabelLayer = null; acLabelItems = []; acLabelSig = ""; },
 };
 
+/**
+ * Dead-ball / kick-off gate fix for pad-driven humans.
+ *
+ * The engine's set-piece states (`ThrowIn`, `GoalKick`, `Corner`, `Kickoff`)
+ * all gate their "start" on `pitch.allPlayersReady`, which is
+ * `isReady.send(this.players).every(...)` over the WHOLE roster. A player we
+ * have taken control of sits in `HumanMove` and never answers "ready", so the
+ * gate never opens and the ball is held at the taker's feet indefinitely —
+ * the match looks frozen ("AI 拿着球不发球").
+ *
+ * The P5 kick-off fix only DEFERS binding until after the whistle, but it does
+ * not cover mid-match set-pieces. Here we override the pitch's
+ * `allPlayersReady` getter: if any roster player carries `__acHuman` (set in
+ * acBindSeat, cleared in acReleasePad) we report ready regardless, restoring
+ * the all-AI auto-resume behaviour. The original getter is preserved as the
+ * fallback for the all-AI case.
+ *
+ * --- the KICK-OFF half of the gate must stay closed until the ball lands ---
+ *
+ * `allPlayersReady` is not ONE condition, it is `isReady.send(players).every()`
+ * — an AND of every player's own readiness. During a kick-off one of those
+ * terms is the TAKER's, whose state says:
+ *
+ *     onIsReady: function (t) {
+ *       return t.pitch.ball.onGround && t.canKickBall && t.speed < .01;
+ *     }                                     // players/states, state "Kickoff"
+ *
+ * i.e. the engine deliberately refuses to start play while the kick-off ball
+ * is still in the air — `states.Kickoff.enter` drops it at
+ * `ball.placeAtPosition(center.x, center.y, 10)`, so it has to fall ~1.8 s.
+ *
+ * Short-circuiting the WHOLE getter (as the first version of this patch did)
+ * therefore lets `Kickoff` finish ~1 s in, with the ball still ~5 units up.
+ * `Match.enter` then fires `play.send(team)`, the taker enters its kick-off
+ * assist kick and **kicks the airborne ball**, which sails ~5-6 units off the
+ * centre and lands somewhere arbitrary:
+ *
+ *     st=Match ball=(17.5,11.33,z4.97) v=(0,0,-6.98) lt=5    <- falling
+ *     st=Match ball=(17.8,11.08,z4.90) v=(5.85,-4.98,0.53) lt=13 <- kicked!
+ *     ... lands at (22.5,7.1) instead of (17.5,11.3)
+ *
+ * Symptom the user reported: "进球后重新开球不是从中间掉落，而是随机掉落球的"
+ * (measured live with .scratch/observe-goal-seq.mjs, which hooks the pitch state
+ * machine and ring-samples the ball's position/velocity/lastTouch).
+ *
+ * So: during a kick-off we keep the engine's ball-on-ground term and only
+ * override the term our seats break (a seated human never answers "ready").
+ * Once the ball is rolling on the grass the gate opens exactly as before, so
+ * the P-2 wedge fix (§2.3.1) is untouched. `ChangeSides` is listed too for
+ * symmetry — it already parks the ball on the ground, so it is a no-op there.
+ */
+/* how far above the grass the ball may still be for a kick-off to count as
+   "landed". radius is .12 (settings BALL_RADIUS) and the ball rests at exactly
+   z = radius, so this tolerates the settle-in frames without ever letting a
+   ball that is still visibly airborne through. */
+var AC_KICKOFF_GROUND_Z = 0.08;
+/* Safety valve: the drop is deterministic (~1.4 s of fall + a couple of settles),
+   so if the ball has somehow stayed airborne this long the restart is wedged and
+   we would rather start play than freeze the match. Measured restarts settle in
+   ~2-4 s, comfortably under this bound. */
+var AC_KICKOFF_MAX_AIR_MS = 5000;
+function acPatchReadiness(pitch) {
+  try {
+    if (pitch.__acReadyPatched) return;
+    // locate the ORIGINAL getter on the prototype chain (skip any already
+    // wrapped instance getter so we never wrap our own wrapper -> recursion)
+    var base = null, p = Object.getPrototypeOf(pitch);
+    while (p) {
+      var d = Object.getOwnPropertyDescriptor(p, "allPlayersReady");
+      if (d && d.get && !d.get.__acReadyWrap) { base = d.get; break; }
+      p = Object.getPrototypeOf(p);
+    }
+    if (!base) { pitch.__acReadyPatched = true; return; }
+    Object.defineProperty(pitch, "allPlayersReady", {
+      configurable: true,
+      get: function () {
+        try {
+          // Kick-off / change-sides: honour the engine's own "the ball must
+          // have landed before play starts" term (see the block comment above
+          // acPatchReadiness). Without this the taker kicks the falling ball
+          // and the restart lands off-centre.
+          var cur = this.states && this.states.current;
+          var curName = cur && cur.constructor ? cur.constructor.name : "";
+          var kb = this.ball;
+          if (curName === "Kickoff" || curName === "ChangeSides") {
+            var airborne = !!(kb && kb.position &&
+              kb.position.z > (kb.radius || 0.12) + AC_KICKOFF_GROUND_Z);
+            if (airborne) {
+              var ts = (window.performance && window.performance.now)
+                ? window.performance.now() : Date.now();
+              if (!this.__acAirSince) this.__acAirSince = ts;
+              if (ts - this.__acAirSince < AC_KICKOFF_MAX_AIR_MS) return false;
+            } else {
+              this.__acAirSince = 0;
+            }
+          }
+          // Bulletproof short-circuit: any human currently seated forces the
+          // dead-ball gate open (restores all-AI auto-resume). Independent of
+          // the shape of pitch.players.
+          if (window.__acHumanSeated) return true;
+          // Fallback per-player scan. NOTE: pitch.players is a PLAIN ARRAY
+          // (redTeam.players.concat(blueTeam.players)), NOT a Collection, so it
+          // has no .all() — handle both shapes explicitly.
+          var pls = this.players;
+          var arr = null;
+          if (pls && typeof pls.all === "function") arr = pls.all();
+          else if (Array.isArray(pls)) arr = pls;
+          else if (pls) arr = [pls];
+          if (arr) {
+            for (var i = 0; i < arr.length; i++) {
+              if (arr[i] && arr[i].__acHuman) return true;
+            }
+          }
+        } catch (e2) {}
+        return base.call(this);
+      },
+    });
+    Object.getOwnPropertyDescriptor(pitch, "allPlayersReady").get.__acReadyWrap = true;
+    pitch.__acReadyPatched = true;
+  } catch (e) {}
+}
+
+/* =====================================================================
+   Req #2 — an AI team-mate that traps the ball used to FREEZE ("AI 拿球走一会儿
+   就卡死，断线后才动") and the whole team played "weak". Root cause, reproduced
+   with .scratch/observe-freeze.mjs (1 phone + AI, rest of the team AI):
+
+   The engine's outfield-trap handler (match.rebuilt.js @617051):
+
+       t.hasBall
+         ? (t.team.isAI ? change(Lt)                        // pure-AI team -> AI dribble
+            : t.controller ? change(Jt)                     // already human -> human
+            : t.team.closestUser(pos).takeControl(t, Jt))   // else hand to nearest user
+         : (...)
+
+   Our seat team is NOT all-AI (a locked seat user is present, so `team.isAI` is
+   false) and the carrier has no controller, so it falls into the LAST branch and
+   calls `closestUser(pos).takeControl(carrier, Jt)`. `closestUser` returns the
+   locked seat user (it is the only team user), and our lock guard blocks that
+   takeControl -> the carrier is dropped into a no-man's-land AI state (AIDefend)
+   and crawls at ~1 px/tick. The team also plays weak because its ball carrier
+   can never advance.
+
+   Fix: when EVERY team user is locked (seat mode), make `closestUser` return an
+   AI proxy whose `takeControl` simply routes the carrier into AIDribble — exactly
+   the state the engine itself uses when team.isAI is true (Lt === AIDribble, see
+   match.rebuilt.js @676284 `AIDribble:Lt`). The seat player is untouched because
+   it HAS a controller, so it still hits the `t.controller ? change(Jt)` branch and
+   stays human. Held/suspended seats are already removed from `team.users` by
+   acHoldPad, so the team reads as all-AI and the trap short-circuits to Lt.
+   ===================================================================== */
+var acAIProxy = {
+  locked: false,
+  controller: null,
+  player: null,
+  takeControl: function (player /*, state */) {
+    try {
+      var st = runtime("players/states");
+      var ai = st.AIDribble || st.AIDefend;
+      if (ai && player && player.states && typeof player.states.change === "function") {
+        player.states.change(ai);
+      }
+    } catch (e) {}
+    return;
+  },
+  attachControl: function () {},
+  releaseControl: function () {},
+};
+function acPatchClosestUser(pitch) {
+  if (!pitch) return;
+  var teams = [pitch.redTeam, pitch.blueTeam];
+  for (var ti = 0; ti < teams.length; ti += 1) {
+    var team = teams[ti];
+    if (!team) continue;
+    var proto = Object.getPrototypeOf(team);
+    if (!proto || !proto.closestUser || proto.closestUser.__acPatched) continue;
+    var orig = proto.closestUser;
+    proto.closestUser = function (pos) {
+      var users = this.users || [];
+      var allLocked = users.length > 0 && users.every(function (u) { return !!u.locked; });
+      if (allLocked) return acAIProxy;
+      return orig.call(this, pos);
+    };
+    proto.closestUser.__acPatched = true;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Req #2 (root fix) — a seat team must RUN AS AI.
+
+   The engine's every AI player-state (AIDribble/AIDefend/...) begins with
+   `if(!t.team.isAI) return void r(t)` — i.e. an AI player on a NON-AI team is
+   a NO-OP. A seat team has `team.isAI === false` (the locked seat User lives in
+   `team.users`, so `0 === users.length` is false), which is exactly why the 6 AI
+   team-mates froze / played weak ("AI 拿球走一会儿就卡死，队伍集体变弱智").
+
+   Fix: force `team.isAI` to TRUE for any team that carries a fixed seat. Then the
+   engine's own AI drives all 6 outfield players (ball capture -> AIDribble now
+   actually runs; set-pieces -> activateAI instead of the broken
+   closestUser/takeControl hand-off). The single seated human is kept human by a
+   post-update enforcement (acEnforceSeatHumans) that re-asserts HumanMove/
+   HumanDribble every frame — see acBootPads' pitch.update hook.
+
+   We also mirror the opponent's AI difficulty onto the seat team (the default
+   "human" team.ai is 0 = weakest), which is the other half of "weak team".
+   --------------------------------------------------------------------- */
+function acMakeTeamAI(team) {
+  if (!team || team.__acForcedAI) return;
+  try {
+    Object.defineProperty(team, "isAI", { configurable: true, get: function () { return true; } });
+    team.__acForcedAI = true;
+  } catch (e) {}
+}
+function acMatchTeamAI(team, pitch) {
+  if (!team || !pitch) return;
+  try {
+    var opp = (team === pitch.redTeam) ? pitch.blueTeam : pitch.redTeam;
+    if (opp && typeof opp.ai === "number" && opp.ai > (team.ai || 0)) team.ai = opp.ai;
+    else if (typeof team.ai !== "number" || team.ai < 1) team.ai = 3;
+  } catch (e) {}
+}
+
+/* Keep the single seated human human-controlled even though its team now runs as
+   AI (acMakeTeamAI). The engine's trap branch `team.isAI ? change(Lt)` would flip
+   a ball-winning seat player into AIDribble; we re-assert the human state every
+   frame AFTER pitch.update so the rendered frame is always the human state. */
+function acEnforceSeatHumans(pitch) {
+  if (!pitch || !window.__acPads) return;
+  try {
+    var st = runtime("players/states");
+    for (var i = 0; i < window.__acPads.length; i += 1) {
+      var pad = window.__acPads[i];
+      var p = pad && pad.__player;
+      var u = pad && pad.__user;
+      if (!p || !u || !u.controller || !u.controller.connected) continue;
+      var cur = p.states && p.states.current;
+      var cls = cur ? cur.constructor : null;
+      if (cls && (cls.__acHumanOk || cls.__acNeverReseat)) continue;
+      var want = (p.hasBall && st.HumanDribble) ? st.HumanDribble : st.HumanMove;
+      if (want && p.states && typeof p.states.change === "function" && cls !== want) {
+        p.states.change(want);
+      }
+    }
+  } catch (e) {}
+}
+
+/**
+ * Phone-side live camera feed (Req #3).
+ *
+ * The big screen follows the ball; each phone would rather see the pitch framed
+ * on the player IT controls. We don't spin up a second WebGL camera (that would
+ * mean reverse-engineering the engine's camera transform and re-rendering the
+ * scene per phone) — instead we grab the current big-screen frame ONCE per tick
+ * via the renderer's extract (the same call captureMatch uses), then for each
+ * pad crop a region centred on its player using the engine's own
+ * `worldToScreenFlat` projection (the exact mapping the overhead name plates
+ * use). One extract, N cheap 2D crops, streamed as JPEGs through the relay.
+ */
+var acPhoneViewTimer = null;
+var acViewRMap = null;     // cached id -> player renderer (screen-space .position)
+var acViewRMapFor = null;  // stadium the cache was built for
+function acPhoneViewTick() {
+  try {
+    var dbg = window.__acViewDebug || (window.__acViewDebug = {
+      ticks: 0, sent: 0, lastBail: "", lastError: "",
+      frames: 0, lastSkip: "", lastAcLan: null, lastUrlLen: 0
+    });
+    dbg.ticks += 1;
+    var g = window.__matchGame;
+    if (!g || !g.renderer || !g.renderer.extract) { dbg.lastBail = "no-renderer/extract"; return; }
+    var st = window.__acPadsState;
+    if (!st || !st.live) { dbg.lastBail = "pads-not-live"; return; } // only once the match is under way
+    var pads = window.__acPads;
+    if (!pads || !pads.length) { dbg.lastBail = "no-pads"; return; }
+
+    var full = null; // extracted lazily, shared by every pad this tick
+    var W = 400, H = 300; // phone canvas target (4:3)
+    dbg.lastAcLan = !!(window.__acLan && window.__acLan.send);
+    for (var i = 0; i < pads.length; i += 1) {
+      var pad = pads[i];
+      var player = pad && pad.__player;
+      if (!player || !player.position) { dbg.lastSkip = "no-player(" + i + ")"; continue; }
+      if (!full) {
+        try { full = g.renderer.extract.canvas(); }
+        catch (ex) { dbg.lastSkip = "extract-throw:" + String((ex && ex.message) || ex); continue; }
+      }
+      if (!full || !full.width) { dbg.lastBail = "extract-empty"; continue; }
+
+      /* Where is this player ON THE BIG-SCREEN FRAME?
+         Two traps here, both found with .scratch/observe-lan.mjs:
+
+         1. `renderer.position` (what the name plates use) is in the STADIUM's
+            CHILD space: the camera translation is already applied but the
+            stadium's own fit-to-view transform is NOT. Measured live:
+                stadium  position (-1717.7, -1407)  scale 2.371
+                player   local    ( 2028.8,  2134.3)
+                player   global   ( 3092.6,  3653.3)   <- stage px
+            The naive value is therefore off by the 2.371 scale plus a ~1700 px
+            shift, so the crop parked near the top-left and only "moved" once
+            the player shoved it off the clamp — exactly the user's
+            "只有球员往左下角移动的时候画面会跟着".
+            `getGlobalPosition()` walks the whole parent chain (scales included)
+            and returns stage px = the CSS px space the extract canvas is drawn
+            in. So it is the transform-correct answer.
+         2. `worldToScreenFlat(pos)` takes an OUT param: calling it with one
+            argument throws ("Cannot set properties of undefined (setting
+            'x')"), which is how the previous attempt silently emitted 0 frames.
+         `resolution` and the OS window size are both irrelevant — only the
+         extract canvas and its CSS width matter, and their ratio IS the
+         renderer resolution. */
+      var px = null, py = null;
+      try {
+        if (!acViewRMap || acViewRMapFor !== g.stadium) { acViewRMap = acRendererMap(g.stadium); acViewRMapFor = g.stadium; }
+        var rp = player.id != null ? acViewRMap[player.id] : null;
+        if (rp && typeof rp.getGlobalPosition === "function") {
+          var gp = rp.getGlobalPosition();
+          var view = g.renderer.view;
+          px = gp.x * (full.width / ((view && view.clientWidth) || (view && view.width) || full.width));
+          py = gp.y * (full.height / ((view && view.clientHeight) || (view && view.height) || full.height));
+        }
+      } catch (ex) { dbg.lastSkip = "proj:" + String((ex && ex.message) || ex); }
+      if (px == null || py == null || !isFinite(px) || !isFinite(py)) { dbg.lastSkip = "no-proj(" + i + ")"; continue; }
+
+      /* A close follow-cam, not a wide shot: 0.34 of the frame width — the old
+         0.55-of-frame-height box was so large the crop could only slide inside
+         ~27% x 45% of the screen before clamping, and it made the player tiny.
+
+         BUT the engine's camera follows the BALL and only covers ~1/5 of the
+         pitch width (measured: the seated player's frame x ranged over
+         -1598..4235 while the frame is 0..1280 stage px — on camera only 3 of
+         16 samples). A player away from the play is simply NOT in the rendered
+         frame, so cropping pins the view to a corner of grass. Easing back to
+         the WHOLE frame is strictly more useful than a frozen corner, and it is
+         what the big screen is showing anyway. `__acCamZoom` is the eased mix so
+         the pull-back is smooth instead of a cut. */
+      var margin = 60;
+      var want = (px >= -margin && px <= full.width + margin && py >= -margin && py <= full.height + margin) ? 1 : 0;
+      var zoom = pad.__acCamZoom == null ? want : pad.__acCamZoom + (want - pad.__acCamZoom) * 0.22;
+      if (Math.abs(want - zoom) < 0.01) zoom = want;
+      pad.__acCamZoom = zoom;
+
+      var tightW = full.width * 0.34;
+      var tightH = tightW * (H / W);
+      var cropW = tightW + (full.width - tightW) * (1 - zoom);
+      var cropH = tightH + (full.height - tightH) * (1 - zoom);
+      // centre on the player's BODY (not the feet) while zoomed in; glide to the
+      // frame centre as we pull out, so the clamp lands on a full frame.
+      var bodyH = (acLabelHeadMax || AC_LABEL_FALLBACK_LIFT) * ((g.stadium && g.stadium.scale && g.stadium.scale.y) || 1);
+      var cenX = px * zoom + (full.width / 2) * (1 - zoom);
+      var cenY = py * zoom + (full.height / 2) * (1 - zoom) - Math.min(bodyH * 0.55, cropH * 0.35) * zoom;
+      var ocx = Math.max(0, Math.min(full.width - cropW, cenX - cropW / 2));
+      var ocy = Math.max(0, Math.min(full.height - cropH, cenY - cropH / 2));
+
+      var cv = document.createElement("canvas");
+      cv.width = W;
+      cv.height = Math.max(2, Math.round(W * (cropH / cropW))); // never stretch the JPEG
+      var ctx = cv.getContext("2d");
+      ctx.drawImage(full, ocx, ocy, cropW, cropH, 0, 0, cv.width, cv.height);
+      var url;
+      try { url = cv.toDataURL("image/jpeg", 0.52); } catch (e2) { dbg.lastSkip = "dataurl-err:" + String((e2 && e2.message) || e2); continue; }
+      dbg.frames += 1;
+      dbg.lastUrlLen = url ? url.length : 0;
+      dbg.lastCrop = { px: Math.round(px), py: Math.round(py), ocx: Math.round(ocx), ocy: Math.round(ocy), cw: Math.round(cropW), ch: Math.round(cropH), zoom: +zoom.toFixed(2) };
+      if (url && url.length > 200 && window.__acLan && window.__acLan.send) {
+        window.__acLan.send({ t: "view", padId: pad.padId, data: url });
+        dbg.sent += 1;
+      } else {
+        dbg.lastSkip = "skip:url=" + (url ? url.length : 0) + ",acLan=" + dbg.lastAcLan;
+      }
+    }
+  } catch (e) {
+    if (window.__acViewDebug) window.__acViewDebug.lastError = String((e && e.message) || e);
+  }
+}
+
 (function acBootPads() {
   try {
     if (window.__matchGame && window.__matchGame.pitch) {
       if (!acPadsHookInstalled) {
         acPadsHookInstalled = true;
         var pitch = window.__matchGame.pitch;
+        // Install the lock guard UNCONDITIONALLY (not gated on pads mode). A
+        // pad-test harness re-wraps User.prototype at runtime and captures
+        // whatever is on it into window.__p0orig, so the guard must already be
+        // present BEFORE that capture. Without it, the engine's
+        // "Cannot take control, player already controlled" throw during
+        // users.update() leaks as an uncaught rAF error. acInstallLockGuard is
+        // idempotent (proto.__acLockGuard), so the later acEnterPadsMode call is
+        // a harmless no-op.
+        try { acInstallLockGuard(runtime("users")); } catch (e) {}
+        acPatchReadiness(pitch);
+        acPatchClosestUser(pitch);
         var origPitchUpdate = pitch.update.bind(pitch);
         pitch.update = function (elapsed) {
           try { acSyncPads(); } catch (e) {
             if (acPadsErrors.length < 8) acPadsErrors.push("hook:" + ((e && e.message) || e));
           }
-          return origPitchUpdate(elapsed);
+          var r = origPitchUpdate(elapsed);
+          // Req #2: with the seat team running as AI, re-assert the seated human's
+          // human state AFTER the engine update (the trap flips it to AIDribble).
+          try { acEnforceSeatHumans(pitch); } catch (e) {
+            if (acPadsErrors.length < 8) acPadsErrors.push("enforce:" + ((e && e.message) || e));
+          }
+          return r;
         };
         window.__acPadsState = { active: false, errors: acPadsErrors, seats: 0 };
       }
@@ -871,6 +1457,9 @@ window.__acLabels = {
         acLabelRaf = true;
         window.requestAnimationFrame(acLabelTick);
       }
+      // Phone live camera feed removed: the upscaled crop was too blurry at
+      // full-screen, and the pad works better as a pure wireless gamepad. The
+      // producer (acPhoneViewTick) is intentionally never started.
       return;
     }
   } catch (e) {}

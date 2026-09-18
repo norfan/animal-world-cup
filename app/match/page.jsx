@@ -3,6 +3,7 @@ import MatchChrome from "./MatchChrome";
 import MatchAudio from "./MatchAudio";
 import LanHostBridge from "./LanHostBridge";
 import OnlineMatchBridge from "./OnlineMatchBridge";
+import AcViewDebug from "./AcViewDebug";
 import "../ui/kit.css";
 import "./match.css";
 
@@ -20,6 +21,8 @@ export default function MatchPage() {
       <LanHostBridge />
       {/* No-op unless ?online=<ROOM> is present. */}
       <OnlineMatchBridge />
+      {/* Diagnostic only: shows when the host URL has ?acdebug=1 */}
+      <AcViewDebug />
     </>
   );
 }

@@ -333,8 +333,15 @@ wss.on("connection", (ws) => {
         ws.__role = "pad";
         ws.__room = code;
         ws.__padId = held.padId;
-        send(ws, { t: "joined", padId: held.padId, room: code, resumed: true, ...bindingOf(held) });
+        // `started` tells the pad app to jump straight to LIVE. A phone that drops
+        // mid-match and re-enters never receives the host's kickoff `start`
+        // (that broadcast only reaches pads connected AT kickoff), so without this
+        // flag the reconnected pad stays in "ready" and gates ALL input off —
+        // the reclaimed player can't move. `room.locked` is set true at kickoff
+        // (host sends lock:true) and stays true for the whole match.
+        send(ws, { t: "joined", padId: held.padId, room: code, resumed: true, started: !!room.locked, ...bindingOf(held) });
         pushRoster(room);
+        if (room.locked) send(ws, { t: "start", slot: held.slot, side: held.side, number: held.number, playerId: held.playerId, info: null });
         return;
       }
 
@@ -363,8 +370,12 @@ wss.on("connection", (ws) => {
       ws.__role = "pad";
       ws.__room = code;
       ws.__padId = pad.padId;
-      send(ws, { t: "joined", padId: pad.padId, room: code, ...bindingOf(pad) });
+      send(ws, { t: "joined", padId: pad.padId, room: code, started: !!room.locked, ...bindingOf(pad) });
       pushRoster(room);
+      // See the reconnect branch above: a pad joining while the match is already
+      // locked (mid-match, or a late lobby join after kickoff) must get `start`
+      // or it will sit in "ready" and never stream input.
+      if (room.locked) send(ws, { t: "start", slot: pad.slot, side: pad.side, number: pad.number, playerId: pad.playerId, info: null });
       return;
     }
 
@@ -480,6 +491,17 @@ wss.on("connection", (ws) => {
       room.locked = false;
       for (const p of room.pads.values()) send(p.ws, { t: "ended" });
       pushRoster(room);
+      return;
+    }
+
+    // --- host -> a single pad: live camera feed (Req #3) ----------------------
+    // `data` is a JPEG data URL cropped around that pad's own player. Routed to
+    // the specific pad; dropped silently if the phone has since disconnected.
+    if (msg.t === "view" && ws.__role === "host") {
+      const pad = room.pads.get(msg.padId);
+      if (pad && pad.ws && typeof msg.data === "string") {
+        send(pad.ws, { t: "view", data: msg.data });
+      }
       return;
     }
   });
