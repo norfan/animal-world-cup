@@ -175,6 +175,13 @@ export default function LanHostBridge() {
           return;
         }
 
+        if (msg.t === "zoom") {
+          // 第一个手柄控制大屏相机缩放（relay 已过滤为第一个 pad）
+          const d = Number(msg.d);
+          if (isFinite(d) && d > 0 && window.__matchZoom) window.__matchZoom.step(d);
+          return;
+        }
+
         if (msg.t === "locked") {
           window.__acLanRoster = { ...(window.__acLanRoster || { room }), room, locked: !!msg.locked };
           return;

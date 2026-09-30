@@ -127,6 +127,27 @@
 .pad-btn--pass { left: 0; top: 33%; background: #58c06a; }
 .pad-btn--tackle { right: 0; top: 33%; background: #e0a23c; }
 .pad-btn--shoot { left: 33%; bottom: 0; background: #e2574c; }
+.pad-zoom {
+  position: fixed;
+  left: 14px;
+  top: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 5;
+}
+.pad-zoom-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(20, 34, 26, 0.72);
+  color: #e9f5dd;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+}
+.pad-zoom-btn:active { transform: scale(0.9); background: rgba(93, 144, 56, 0.85); }
 .pad-btn--sprint {
   left: 33%; top: 33%;
   width: 34%; height: 34%;

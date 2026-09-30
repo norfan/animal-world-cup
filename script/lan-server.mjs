@@ -126,6 +126,12 @@ function padsOfSide(room, side) {
   return [...room.pads.values()].filter((p) => p.side === side);
 }
 
+// 第一个接入的手柄拥有大屏相机缩放权（序入序 = 加入顺序；掉线保留席位期间仍是它）
+function zoomControllerId(room) {
+  const first = room.pads.values().next().value;
+  return first ? first.padId : null;
+}
+
 /**
  * Smallest bindable jersey number still free on `side`, or -1 when there is no
  * seat left. "No seat" means EITHER the per-side human cap is reached OR every
@@ -219,6 +225,7 @@ function pushOccupancy(room) {
       blue: occ.blue,
       bindable: bindableFor(room),
       gkNumber: GK_NUMBER,
+      zoomControl: pad.padId === zoomControllerId(room),
       me: { padId: pad.padId, ...bindingOf(pad) },
     });
   }
@@ -441,6 +448,16 @@ wss.on("connection", (ws) => {
           padId: ws.__padId,
           d: msg.d,
         });
+      }
+      return;
+    }
+
+    // --- pad -> host: camera zoom (FIRST pad only, so two phones can't fight) ---
+    if (msg.t === "zoom" && ws.__role === "pad") {
+      const pad = room.pads.get(ws.__padId);
+      if (pad && pad.ws === ws && zoomControllerId(room) === pad.padId) {
+        const d = Number(msg.d);
+        if (isFinite(d) && d > 0) send(room.host, { t: "zoom", d });
       }
       return;
     }

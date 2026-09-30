@@ -29,6 +29,8 @@ const ShootIcon = () => (
 const LobIcon = () => <SVG><path d="M4 16.5C8 7.5 16 7.5 20 14" /><path d="M20 14l.4-3.9M20 14l-3.8 1.2" /></SVG>;
 const TackleIcon = () => <SVG><path d="M12 3.4l6.6 2.4v5c0 3.9-2.9 6.6-6.6 7.8C8.3 17.4 5.4 14.7 5.4 10.8v-5z" /></SVG>;
 const SprintIcon = () => <SVG s={28}><path d="M6 6l6 6-6 6" /><path d="M13 6l6 6-6 6" /></SVG>;
+const ZoomInIcon = () => <SVG s={24}><circle cx="12" cy="12" r="7.6" /><path d="M12 8.8v6.4M8.8 12h6.4" /></SVG>;
+const ZoomOutIcon = () => <SVG s={24}><circle cx="12" cy="12" r="7.6" /><path d="M8.8 12h6.4" /></SVG>;
 
 const SIDE_CLS = { red: "pad--red", blue: "pad--blue" };
 const SIDE_LABEL = { red: "红队", blue: "蓝队" };
@@ -83,6 +85,7 @@ export default function PadController({ room, transport = "lan", requestedSlot =
   const [locked, setLocked] = useState(false);
   const [picker, setPicker] = useState(false);
   const [pickErr, setPickErr] = useState(null);
+  const [zoomControl, setZoomControl] = useState(false); // 第一个手柄拥有大屏缩放控制权
   const statusRef = useRef("connecting");
   const lanRef = useRef(null);
   const seqRef = useRef(0);
@@ -142,6 +145,7 @@ export default function PadController({ room, transport = "lan", requestedSlot =
         else if (msg.t === "occupancy") {
           setOcc({ red: msg.red || [], blue: msg.blue || [] });
           if (typeof msg.locked === "boolean") setLocked(msg.locked);
+          if (typeof msg.zoomControl === "boolean") setZoomControl(msg.zoomControl);
           if (msg.me) setSeat(seatFrom(msg.me));
         }
         else if (msg.t === "locked") { setLocked(!!msg.locked); }
@@ -224,6 +228,12 @@ export default function PadController({ room, transport = "lan", requestedSlot =
       seq: ++seqRef.current,
       d: { vx: i.vx, vy: i.vy, shoot: i.shoot, sprint: i.sprint, [key]: true },
     });
+  }
+
+  // 缩放按钮：发给服务端，第一个手柄专用（服务端会过滤）
+  function sendZoom(d) {
+    if (statusRef.current !== "playing") return;
+    lanRef.current && lanRef.current.send({ t: "zoom", d });
   }
 
   function stickDown(e) {
@@ -336,6 +346,17 @@ export default function PadController({ room, transport = "lan", requestedSlot =
         <button type="button" className="pad-btn pad-btn--shoot" {...shootBtnProps}><ShootIcon /></button>
         <button type="button" className="pad-btn pad-btn--sprint" {...hold("sprint")}><SprintIcon /></button>
       </div>
+
+      {status === "playing" && zoomControl ? (
+        <div className="pad-zoom" role="group" aria-label="缩放大屏画面">
+          <button type="button" className="pad-zoom-btn pad-zoom-btn--in"
+                  onPointerDown={(e) => { e.preventDefault(); sendZoom(1.18); }}
+                  aria-label="放大画面"><ZoomInIcon /></button>
+          <button type="button" className="pad-zoom-btn pad-zoom-btn--out"
+                  onPointerDown={(e) => { e.preventDefault(); sendZoom(1 / 1.18); }}
+                  aria-label="缩小画面"><ZoomOutIcon /></button>
+        </div>
+      ) : null}
 
       {picker ? (
         <div className="pad-picker" role="dialog" aria-modal="true" aria-label="选择号码">
