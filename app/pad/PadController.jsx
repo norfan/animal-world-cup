@@ -31,6 +31,8 @@ const TackleIcon = () => <SVG><path d="M12 3.4l6.6 2.4v5c0 3.9-2.9 6.6-6.6 7.8C8
 const SprintIcon = () => <SVG s={28}><path d="M6 6l6 6-6 6" /><path d="M13 6l6 6-6 6" /></SVG>;
 const ZoomInIcon = () => <SVG s={24}><circle cx="12" cy="12" r="7.6" /><path d="M12 8.8v6.4M8.8 12h6.4" /></SVG>;
 const ZoomOutIcon = () => <SVG s={24}><circle cx="12" cy="12" r="7.6" /><path d="M8.8 12h6.4" /></SVG>;
+const KickIcon = () => <SVG s={26}><path d="M9 6.5v11l9-5.5z" /></SVG>;
+const ReplayIcon = () => <SVG s={26}><path d="M6.4 11.2a5.6 5.6 0 1 1 1.6 5.4M6.4 11.2V6.4" /><path d="M6.4 11.2h4.6" /></SVG>;
 
 const SIDE_CLS = { red: "pad--red", blue: "pad--blue" };
 const SIDE_LABEL = { red: "红队", blue: "蓝队" };
@@ -86,6 +88,7 @@ export default function PadController({ room, transport = "lan", requestedSlot =
   const [picker, setPicker] = useState(false);
   const [pickErr, setPickErr] = useState(null);
   const [zoomControl, setZoomControl] = useState(false); // 第一个手柄拥有大屏缩放控制权
+  const [gameOver, setGameOver] = useState(false); // 比赛结束（ended）后显示“再来一局”
   const statusRef = useRef("connecting");
   const lanRef = useRef(null);
   const seqRef = useRef(0);
@@ -132,6 +135,7 @@ export default function PadController({ room, transport = "lan", requestedSlot =
           setSlot(msg.slot);
           setSeat(seatFrom(msg));
           setPadStatus(msg.started ? "playing" : "ready");
+          setGameOver(false);
           if (transport === "online" && msg.token) {
             resumeToken = msg.token;
             try { sessionStorage.setItem(`animalCupOnline:pad:${room}:${msg.slot}`, msg.token); } catch {}
@@ -153,9 +157,9 @@ export default function PadController({ room, transport = "lan", requestedSlot =
           setPickErr(msg.reason);
           if (msg.reason === "locked" || msg.reason === "bad-number" || msg.reason === "taken") setPicker(true);
         }
-        else if (msg.t === "start") { setPadStatus("playing"); if (typeof msg.slot === "number") setSlot(msg.slot); }
-        else if (msg.t === "rematch") { setPadStatus("playing"); }
-        else if (msg.t === "ended") { neutralize(true); setPadStatus("ready"); }
+        else if (msg.t === "start") { setPadStatus("playing"); setGameOver(false); if (typeof msg.slot === "number") setSlot(msg.slot); }
+        else if (msg.t === "rematch") { setPadStatus("playing"); setGameOver(false); }
+        else if (msg.t === "ended") { neutralize(true); setPadStatus("ready"); setGameOver(true); }
         else if (msg.t === "joinErr") {
           neutralize(false);
           setPadStatus(["full", "slot-full", "side-full"].includes(msg.reason) ? "full" : msg.reason === "no-room" ? "no-room" : "denied");
@@ -234,6 +238,14 @@ export default function PadController({ room, transport = "lan", requestedSlot =
   function sendZoom(d) {
     if (statusRef.current !== "playing") return;
     lanRef.current && lanRef.current.send({ t: "zoom", d });
+  }
+
+  // 开始比赛 / 再来一局：第一个手柄专用（服务端会过滤）
+  function sendKick() {
+    lanRef.current && lanRef.current.send({ t: "start" });
+  }
+  function sendRematch() {
+    lanRef.current && lanRef.current.send({ t: "rematch" });
   }
 
   function stickDown(e) {
@@ -355,6 +367,20 @@ export default function PadController({ room, transport = "lan", requestedSlot =
           <button type="button" className="pad-zoom-btn pad-zoom-btn--out"
                   onPointerDown={(e) => { e.preventDefault(); sendZoom(1 / 1.18); }}
                   aria-label="缩小画面"><ZoomOutIcon /></button>
+        </div>
+      ) : null}
+
+      {status === "ready" && zoomControl ? (
+        <div className="pad-ctl" role="group" aria-label="大屏控制">
+          {gameOver ? (
+            <button type="button" className="pad-ctl-btn pad-ctl-btn--rematch"
+                    onPointerDown={(e) => { e.preventDefault(); sendRematch(); }}
+                    aria-label="再来一局"><ReplayIcon /><b>再来一局</b><em>REMATCH</em></button>
+          ) : (
+            <button type="button" className="pad-ctl-btn pad-ctl-btn--kick"
+                    onPointerDown={(e) => { e.preventDefault(); sendKick(); }}
+                    aria-label="开始比赛"><KickIcon /><b>开始比赛</b><em>KICK OFF</em></button>
+          )}
         </div>
       ) : null}
 

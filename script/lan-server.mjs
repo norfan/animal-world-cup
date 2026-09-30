@@ -462,6 +462,16 @@ wss.on("connection", (ws) => {
       return;
     }
 
+    // --- pad -> host: kickoff / rematch request (FIRST pad only, same guard
+    //     as zoom so two phones can't race the kickoff) ---
+    if ((msg.t === "start" || msg.t === "rematch") && ws.__role === "pad") {
+      const pad = room.pads.get(ws.__padId);
+      if (pad && pad.ws === ws && zoomControllerId(room) === pad.padId) {
+        send(room.host, { t: msg.t });
+      }
+      return;
+    }
+
     // --- host -> pads: start the match (carries match params for display) ---
     if (msg.t === "start" && ws.__role === "host") {
       for (const p of room.pads.values()) {

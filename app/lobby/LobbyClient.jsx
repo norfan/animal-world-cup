@@ -58,6 +58,9 @@ export default function LobbyClient({ red, blue, side, ai, time, squad, teamMode
           QRCode.toDataURL(apk, { margin: 1, width: 160, color: { dark: "#1d3d16", light: "#ffffff" } })
             .then(setApkQr)
             .catch(() => setApkQr(null));
+        } else if (msg.t === "start") {
+          // 第一个手柄在 pad 上点了“开始比赛”：与大屏按钮同一入口
+          startRef.current && startRef.current();
         } else if (msg.t === "roster") {
           setPads(msg.pads || []);
           if (msg.counts) setCounts(msg.counts);
@@ -76,6 +79,9 @@ export default function LobbyClient({ red, blue, side, ai, time, squad, teamMode
     ? (counts[requiredSide] || { humans: 0 }).humans
     : pads.filter((p) => p.side === requiredSide).length;
   const canStart = requiredHumans >= 1;
+
+  const startRef = useRef(null);
+  startRef.current = start;
 
   function start() {
     if (!room || !canStart) return;

@@ -175,6 +175,12 @@ export default function LanHostBridge() {
           return;
         }
 
+        if (msg.t === "rematch") {
+          // 第一个手柄点了“再来一局”：与大屏重赛按钮一致（reload 进下一局）
+          window.location.reload();
+          return;
+        }
+
         if (msg.t === "zoom") {
           // 第一个手柄控制大屏相机缩放（relay 已过滤为第一个 pad）
           const d = Number(msg.d);
