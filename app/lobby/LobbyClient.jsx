@@ -70,8 +70,12 @@ export default function LobbyClient({ red, blue, side, ai, time, squad, teamMode
     return () => lan.close();
   }, []);
 
-  const redHumans = counts ? counts.red.humans : pads.filter((p) => p.side === "red").length;
-  const canStart = redHumans >= 1; // the red side needs at least one human to play
+  // 开赛门槛：分边模式要求红方有人；同队模式要求目标队有人
+  const requiredSide = teamMode === "same" ? sameSide : "red";
+  const requiredHumans = counts
+    ? (counts[requiredSide] || { humans: 0 }).humans
+    : pads.filter((p) => p.side === requiredSide).length;
+  const canStart = requiredHumans >= 1;
 
   function start() {
     if (!room || !canStart) return;
@@ -131,7 +135,9 @@ export default function LobbyClient({ red, blue, side, ai, time, squad, teamMode
             <h2 className="lb-h2">{t("lan.players")}</h2>
             <TeamSeats teamId={red} tone="red" side="red" pads={pads} counts={counts} t={t} />
             <TeamSeats teamId={blue} tone="blue" side="blue" pads={pads} counts={counts} t={t} />
-            <p className="lb-note">{redHumans ? t("lan.noteReady") : t("lan.noteNoRed")}</p>
+            <p className="lb-note">{canStart ? t("lan.noteReady") : teamMode === "same"
+              ? t("lan.noteNoTeam").replace("{s}", t(`home.teamMode.${requiredSide}`))
+              : t("lan.noteNoRed")}</p>
           </section>
         </div>
 

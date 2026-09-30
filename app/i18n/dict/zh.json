@@ -181,6 +181,7 @@
   "lan.players": "球员席位",
   "lan.noteReady": "玩家已就位，可以开球了！",
   "lan.noteNoRed": "红队至少需要 1 名玩家才能开赛。",
+  "lan.noteNoTeam": "{s}至少需要 1 名玩家才能开赛。",
   "lan.humansAI": "玩家 {h} · AI {a}",
   "lan.gk": "门将",
   "lan.back": "返回",

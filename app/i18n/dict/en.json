@@ -181,6 +181,7 @@
   "lan.players": "Squad seats",
   "lan.noteReady": "Players are in — kick off when ready!",
   "lan.noteNoRed": "Red needs at least one phone to start.",
+  "lan.noteNoTeam": "{s} needs at least one phone to start.",
   "lan.humansAI": "Humans {h} · AI {a}",
   "lan.gk": "GK",
   "lan.back": "Back",
