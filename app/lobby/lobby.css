@@ -1,0 +1,202 @@
+/* LAN lobby (big screen). Storybook green to match the Landing; QR + room code
+   on the left, the two player slots on the right. Self-contained styles. */
+
+.lb {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(120% 90% at 50% 0%, #6aa83c 0%, #4f8a2e 45%, #356a1f 100%);
+  color: #fff;
+  font-family: "Baloo 2", system-ui, -apple-system, "PingFang SC", sans-serif;
+  overflow: auto;
+}
+.lb-pattern {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 2px, transparent 2px);
+  background-size: 26px 26px;
+  pointer-events: none;
+}
+.lb-lang { position: absolute; top: 16px; right: 18px; z-index: 5; }
+
+.lb-wrap {
+  position: relative;
+  width: min(960px, 94vw);
+  padding: 28px 22px 36px;
+  text-align: center;
+}
+.lb-title {
+  font-family: "Titan One", "ZCOOL KuaiLe", system-ui, sans-serif;
+  font-size: clamp(28px, 6vw, 52px);
+  margin: 4px 0 6px;
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
+}
+.lb-sub { margin: 0 0 22px; opacity: 0.85; font-size: clamp(14px, 2.4vw, 18px); }
+
+.lb-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+@media (max-width: 680px) { .lb-cols { grid-template-columns: 1fr; } }
+
+.lb-card {
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  padding: 20px 18px;
+  backdrop-filter: blur(6px);
+}
+.lb-h2 { margin: 0 0 14px; font-size: 18px; letter-spacing: 0.04em; opacity: 0.92; }
+
+/* join card */
+.lb-qr {
+  width: 220px;
+  height: 220px;
+  margin: 0 auto 14px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.lb-qr img { width: 100%; height: 100%; display: block; }
+.lb-qr-wait {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 4px solid rgba(0, 0, 0, 0.15); border-top-color: #4f8a2e;
+  animation: lb-spin 0.8s linear infinite;
+}
+@keyframes lb-spin { to { transform: rotate(360deg); } }
+
+.lb-code { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 8px; }
+.lb-code-label { opacity: 0.7; font-size: 14px; }
+.lb-code b {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 30px;
+  letter-spacing: 0.3em;
+  padding-left: 0.3em;
+}
+.lb-url {
+  display: inline-block;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  opacity: 0.8;
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  padding: 5px 10px;
+}
+.lb-hint { margin: 10px 0 0; font-size: 12.5px; opacity: 0.62; }
+
+/* "scan to download the app" block under the join QR — a second, smaller QR so
+   a phone can grab the controller APK straight from the big screen. */
+.lb-apk {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.2);
+  text-align: left;
+}
+.lb-apk-qr {
+  width: 96px;
+  height: 96px;
+  flex: 0 0 auto;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.lb-apk-qr img { width: 100%; height: 100%; display: block; }
+.lb-apk-meta { flex: 1 1 auto; min-width: 0; }
+.lb-apk-meta b { display: block; font-size: 15px; margin-bottom: 2px; }
+.lb-apk-meta span { display: block; font-size: 12px; opacity: 0.7; margin-bottom: 6px; }
+.lb-apk-meta .lb-url { font-size: 11px; opacity: 0.75; }
+
+/* squads card — both sides as 7 numbered seats, seat by seat */
+.lb-squads { display: flex; flex-direction: column; gap: 12px; }
+.lb-team {
+  border-radius: 16px;
+  padding: 10px 11px 11px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+}
+.lb-team--red { border-color: rgba(232, 76, 61, 0.6); }
+.lb-team--blue { border-color: rgba(62, 126, 232, 0.6); }
+.lb-team-head { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.lb-team-meta { flex: 1 1 auto; text-align: left; min-width: 0; }
+.lb-team-meta b { display: block; font-size: 15px; line-height: 1.15; }
+.lb-team-meta span { font-size: 12px; opacity: 0.72; }
+.lb-pp {
+  width: 34px; height: 34px; border-radius: 50%;
+  overflow: hidden; flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.14);
+  display: grid; place-items: center;
+}
+.lb-pp img { width: 100%; height: 100%; object-fit: cover; }
+
+/* one cell per jersey number. The seat colour is a swatch + a rim, never the
+   fill, so the digit stays readable whatever colour the relay hands out. */
+.lb-seats { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.lb-seat {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  padding: 7px 2px 5px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.26);
+  border: 1.5px solid transparent;
+  transition: background 0.18s, border-color 0.18s;
+}
+.lb-seat b { font-size: 15px; line-height: 1; font-weight: 800; }
+.lb-seat i {
+  font-style: normal;
+  font-size: 9.5px;
+  line-height: 1.1;
+  opacity: 0.75;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-seat.is-ai { opacity: 0.45; }
+.lb-seat.is-gk { background: rgba(255, 210, 60, 0.14); border-color: rgba(255, 210, 60, 0.45); }
+.lb-seat.is-human {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: var(--seat, rgba(255, 255, 255, 0.6));
+  box-shadow: 0 0 12px -2px var(--seat, transparent);
+}
+.lb-seat.is-human::before {
+  content: "";
+  position: absolute;
+  top: 3px; right: 4px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--seat, #fff);
+  box-shadow: 0 0 7px var(--seat, transparent);
+}
+.lb-seat.is-human i { opacity: 0.92; }
+.lb-seat.is-held { border-style: dashed; }
+.lb-seat.is-held::before { opacity: 0.4; }
+.lb-note { margin: 2px 0 0; font-size: 13px; opacity: 0.7; }
+
+/* actions */
+.lb-actions { display: flex; justify-content: center; gap: 14px; margin-top: 24px; }
+.lb-btn {
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 17px;
+  padding: 13px 30px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.06s, filter 0.15s;
+}
+.lb-btn:active { transform: scale(0.97); }
+.lb-btn--ghost { background: rgba(0, 0, 0, 0.28); color: #fff; }
+.lb-btn--go { background: #ffd23c; color: #2a3d10; box-shadow: 0 5px 0 #c79a16; }
+.lb-btn--go:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }

@@ -1,0 +1,118 @@
+.or {
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  background: #527f39;
+  color: #355129;
+  font-family: "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
+}
+.or-pattern {
+  position: fixed;
+  inset: 0;
+  background: url("/match-runtime-min/images/interface/pattern.png") repeat;
+  background-size: 100px 100px;
+  opacity: 0.35;
+  animation: or-pan 2.4s linear infinite;
+}
+@keyframes or-pan { to { background-position: 100px 0; } }
+.or-lang { position: fixed; top: 14px; right: 14px; z-index: 20; }
+.or-wrap {
+  position: relative;
+  width: min(920px, calc(100% - 32px));
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 34px 0 48px;
+  box-sizing: border-box;
+}
+.or-head { text-align: center; color: #fff7e2; }
+.or-kicker { font-size: 13px; font-weight: 900; text-transform: uppercase; }
+.or-head h1 { margin: 4px 0 8px; font-size: clamp(28px, 6vw, 50px); letter-spacing: 0; }
+.or-code {
+  display: inline-block;
+  min-width: 210px;
+  padding: 8px 18px;
+  border: 3px solid rgba(255, 247, 226, 0.8);
+  border-radius: 12px;
+  background: rgba(38, 70, 30, 0.58);
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+.or-status { display: block; margin-top: 8px; font-size: 13px; font-weight: 800; }
+.or-status--error { color: #ffd5c8; }
+.or-error {
+  margin: 16px auto 0;
+  max-width: 640px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fff0eb;
+  color: #9a3f2d;
+  text-align: center;
+  font-weight: 800;
+}
+.or-versus {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  max-width: 620px;
+  margin: 24px auto 0;
+}
+.or-team { display: flex; align-items: center; gap: 10px; min-width: 0; color: #fff7e2; }
+.or-team--blue { flex-direction: row-reverse; text-align: right; }
+.or-team img { width: 66px; height: 66px; object-fit: contain; }
+.or-team b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; }
+.or-vs { color: #fff7e2; font-size: 22px; font-weight: 900; }
+.or-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 22px; }
+.or-panel {
+  padding: 18px;
+  border: 3px solid #fffef8;
+  border-radius: 8px;
+  background: #fffef8;
+  box-shadow: 0 10px 24px rgba(30, 55, 22, 0.28);
+}
+.or-panel h2 { margin: 0 0 14px; font-size: 18px; letter-spacing: 0; }
+.or-invite { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 12px; }
+.or-invite code {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 10px; border-radius: 6px; background: #edf3e7; color: #476b36;
+}
+.or-invite button, .or-btn {
+  border: 0; border-radius: 8px; font: 900 14px inherit; cursor: pointer;
+}
+.or-invite button { padding: 0 14px; background: #5d9038; color: #fff7e2; }
+.or-note { min-height: 38px; margin: 0 0 12px; color: #668154; }
+.or-seat {
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 13px;
+  margin-top: 8px;
+  border: 1px solid rgba(90, 120, 70, 0.2);
+  border-radius: 6px;
+  background: #f2f5ef;
+  font-weight: 900;
+}
+.or-seat i { width: 11px; height: 11px; border-radius: 50%; background: #b9c4b1; }
+.or-seat.is-ready { color: #3f712a; background: #e9f4df; }
+.or-seat.is-ready i { background: #66a83e; box-shadow: 0 0 0 4px rgba(102, 168, 62, 0.15); }
+.or-pad-qr { display: grid; justify-items: center; gap: 8px; margin-bottom: 12px; }
+.or-pad-qr img, .or-qr-wait { width: 168px; height: 168px; display: block; background: #edf3e7; }
+.or-pad-qr b { font-size: 13px; color: #52733f; }
+.or-actions { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 18px; }
+.or-btn { min-width: 150px; height: 48px; padding: 0 20px; }
+.or-btn--ghost { background: #fffef8; color: #52733f; }
+.or-btn--start { background: #e0b13f; color: #3f3214; box-shadow: 0 4px 0 #b98a22; }
+.or-btn--start:disabled { opacity: 0.42; cursor: not-allowed; box-shadow: none; }
+.or-wait { color: #fff7e2; font-weight: 900; }
+@media (max-width: 680px) {
+  .or-wrap { width: min(100% - 20px, 920px); padding-top: 76px; }
+  .or-grid { grid-template-columns: 1fr; }
+  .or-versus { gap: 8px; }
+  .or-team img { width: 48px; height: 48px; }
+  .or-team b { font-size: 14px; }
+  .or-code { min-width: 180px; font-size: 27px; }
+  .or-invite { grid-template-columns: 1fr; }
+  .or-invite button { min-height: 40px; }
+}

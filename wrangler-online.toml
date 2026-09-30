@@ -1,0 +1,25 @@
+name = "animal-cup-online"
+main = "cloudflare/online-worker.js"
+compatibility_date = "2026-04-07"
+
+[[durable_objects.bindings]]
+name = "ONLINE_ROOMS"
+class_name = "OnlineRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["OnlineRoom"]
+
+[[ratelimits]]
+name = "CREATE_RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }
+
+[[ratelimits]]
+name = "CONNECT_RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 60, period = 60 }
+
+[vars]
+# Replace with the deployed web origin before production deployment.
+ALLOWED_ORIGINS = "http://localhost:13000,http://127.0.0.1:13000"

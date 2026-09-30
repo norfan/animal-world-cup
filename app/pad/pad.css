@@ -1,0 +1,428 @@
+/* Phone controller page (/pad). A self-contained gamepad surface — it does NOT
+   share the match HUD stylesheet, so everything it needs lives here. Designed
+   for a phone held in landscape: stick bottom-left, action diamond bottom-right. */
+
+.pad {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  background:
+    radial-gradient(120% 80% at 50% 0%, #2f5e22 0%, #1d3d16 60%, #142c10 100%);
+  color: #f4f7ec;
+  font-family: "Baloo 2", system-ui, -apple-system, "PingFang SC", sans-serif;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* team-tinted edge glow so each player can tell their colour at a glance;
+   z-index 4 puts it OUTSIDE the video feed (the `.pad-cam` layer is z-index 1) */
+.pad--red::before,
+.pad--blue::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.pad--red::before { box-shadow: inset 0 0 0 5px rgba(232, 76, 61, 0.85); }
+.pad--blue::before { box-shadow: inset 0 0 0 5px rgba(62, 126, 232, 0.9); }
+
+.pad-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 16px;
+  z-index: 3;
+}
+.pad-badge {
+  font-weight: 800;
+  font-size: 18px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  letter-spacing: 0.06em;
+}
+.pad--red .pad-badge { background: rgba(232, 76, 61, 0.92); }
+.pad--blue .pad-badge { background: rgba(62, 126, 232, 0.95); }
+.pad-room {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 15px;
+  letter-spacing: 0.22em;
+  opacity: 0.75;
+}
+.pad-state {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.pad-state--playing { background: #d6453b; color: #fff; }
+
+/* analog stick */
+.pad-stick {
+  position: absolute;
+  left: max(24px, env(safe-area-inset-left));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  width: 40vw;
+  max-width: 200px;
+  height: 40vw;
+  max-height: 200px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 6px 22px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+  touch-action: none;
+}
+.pad-thumb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 42%;
+  height: 42%;
+  margin: -21% 0 0 -21%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #fefefe, #c9d3bd);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+/* action diamond */
+.pad-pad {
+  position: absolute;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  width: 46vw;
+  max-width: 230px;
+  height: 46vw;
+  max-height: 230px;
+  z-index: 2;
+}
+.pad-btn {
+  position: absolute;
+  width: 34%;
+  height: 34%;
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 5px 13px rgba(0, 0, 0, 0.36);
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.05s ease, filter 0.05s ease;
+}
+.pad-btn:active { transform: scale(0.9); filter: brightness(1.18); }
+.pad-btn--lob { left: 33%; top: 0; background: #5aa0e6; }
+.pad-btn--pass { left: 0; top: 33%; background: #58c06a; }
+.pad-btn--tackle { right: 0; top: 33%; background: #e0a23c; }
+.pad-btn--shoot { left: 33%; bottom: 0; background: #e2574c; }
+.pad-btn--sprint {
+  left: 33%; top: 33%;
+  width: 34%; height: 34%;
+  background: rgba(0, 0, 0, 0.42);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+/* status / standby card (not yet playing) */
+.pad--status { display: grid; place-items: center; }
+.pad-status-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 28px 34px;
+}
+.pad-status-card b { font-size: 24px; }
+.pad-status-card span { opacity: 0.7; font-size: 14px; max-width: 22ch; }
+.pad-room-big {
+  margin-top: 8px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 30px;
+  letter-spacing: 0.32em;
+  padding: 6px 14px 6px 20px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.pad-status-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #fff;
+}
+.pad-status-spinner[data-on="true"] { animation: pad-spin 0.8s linear infinite; }
+@keyframes pad-spin { to { transform: rotate(360deg); } }
+
+/* manual room-code entry (phone that can't scan the QR) */
+.pad-join {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+.pad-join b { font-size: 20px; }
+.pad-code-input {
+  width: 6.2ch;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  text-align: center;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  border-radius: 14px;
+  padding: 10px 8px 10px 16px;
+  outline: none;
+}
+.pad-code-input:focus { border-color: #6cc06a; }
+.pad-join-btn {
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 18px;
+  color: #14320f;
+  background: #8fd07a;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 40px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+.pad-join-btn:disabled { opacity: 0.4; }
+
+/* Portrait blocker: a friendly "rotate your phone" overlay shown over the
+   landscape-only gamepad. Rendered (and auto-dismissed) by PadClient via a
+   matchMedia("(orientation: portrait)") check, so it works even when the page
+   is only a bookmarked shortcut — no PWA / install required. */
+.pad--rotate-hint { display: grid; place-items: center; z-index: 999; }
+
+/* Floating "download the app" pill — always reachable on /pad (the page the
+   lobby QR opens on the phone), so a scan leads straight to a one-tap APK
+   download. Sits above every /pad state including the portrait blocker. */
+.pad-dl {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #14320f;
+  background: rgba(143, 208, 122, 0.95);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  text-decoration: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.pad-dl:active { transform: scale(0.96); }
+.pad-dl-ico { font-size: 15px; line-height: 1; }
+
+/* Version line under the floating download button. Tells the user the latest
+   build and, when the installed APK (reported via ?apk=) is behind, nudges them
+   to update. Tap triggers a fresh download. */
+.pad-dl-info {
+  position: fixed;
+  top: 50px;
+  right: 10px;
+  z-index: 1000;
+  max-width: 60vw;
+  text-align: right;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pad-dl-info:empty { display: none; }
+
+/* First-visit auto-download prompt. Sits above every /pad state (z-index 1000),
+   centered at the bottom so it never covers the stick / action diamond corners
+   or the top team badge. Auto-hides after a few seconds; dismissed for good
+   once the user downloads or closes it (localStorage flag). */
+.pad-dl-banner {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 14px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(92vw, 430px);
+  padding: 8px 8px 8px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.74);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+.pad-dl-banner-txt { flex: 1 1 auto; line-height: 1.3; opacity: 0.95; }
+.pad-dl-banner-ignore {
+  flex: 0 0 auto;
+  font-family: inherit;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  text-decoration: underline;
+  -webkit-tap-highlight-color: transparent;
+}
+.pad-dl-banner-ignore:active { color: #fff; }
+.pad-dl-banner-btn {
+  flex: 0 0 auto;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 13px;
+  color: #14320f;
+  background: #8fd07a;
+  border: none;
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pad-dl-banner-btn:active { transform: scale(0.96); }
+.pad-dl-banner-x {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.rotate-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  padding: 24px;
+}
+.rotate-hint b { font-size: 20px; }
+.rotate-hint span { opacity: 0.7; font-size: 14px; }
+.rotate-phone { position: relative; color: #cfe8bd; }
+.rotate-arrow {
+  position: absolute;
+  right: -8px;
+  top: -8px;
+  font-size: 26px;
+  animation: rotate-spin 1.6s ease-in-out infinite;
+}
+@keyframes rotate-spin {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(90deg); }
+}
+
+/* ---------------------------------------------------------------------------
+   Seat badge + number picker (4v4 seat model).
+   The badge replaces the old P1/P2 slot chip: it is the phone's permanent
+   binding — "红队 5 号" — painted in the same colour the big screen puts above
+   that player's head, so the two screens agree at a glance.
+   --------------------------------------------------------------------------- */
+.pad-seat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 13px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  transition: transform 120ms ease;
+}
+.pad-seat:disabled { cursor: default; opacity: 0.85; }
+.pad-seat:not(:disabled):active { transform: scale(0.95); }
+.pad-seat b { font-size: 15px; font-weight: 800; letter-spacing: 0.04em; }
+.pad-seat em { font-size: 15px; font-style: normal; font-weight: 900; }
+
+.pad-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 14, 10, 0.72);
+  backdrop-filter: blur(3px);
+}
+.pad-picker-card {
+  width: min(88vw, 430px);
+  max-height: 92vh;
+  overflow: auto;
+  padding: 15px 18px 14px;
+  border-radius: 20px;
+  background: #fffef8;
+  color: #1f2a1c;
+  text-align: center;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+}
+.pad-picker-title { display: block; font-size: 17px; font-weight: 800; }
+.pad-picker-sub { display: block; margin-top: 2px; font-size: 11px; color: #6b7a66; }
+.pad-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+.pad-pick {
+  display: grid;
+  gap: 1px;
+  padding: 7px 4px;
+  border: 2px solid rgba(120, 90, 50, 0.22);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1f2a1c;
+  font: inherit;
+  cursor: pointer;
+}
+.pad-pick b { font-size: 20px; font-weight: 900; }
+.pad-pick i { font-size: 9.5px; font-style: normal; color: #6b7a66; }
+.pad-pick.is-mine { border-color: #2f7d32; background: #eaf7ea; }
+.pad-pick.is-taken,
+.pad-pick.is-gk { background: #f1efe6; opacity: 0.45; cursor: not-allowed; }
+.pad-pick:disabled { cursor: not-allowed; }
+.pad-picker-err { margin: 4px 0 0; font-size: 12px; font-weight: 700; color: #c0392b; }
+.pad-picker-note { margin: 6px 0 10px; font-size: 11px; color: #6b7a66; }
+.pad-picker-close {
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: #2f7d32;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* (Phone live camera feed removed — the pad is now a pure wireless gamepad.
+   The upscaled crop was too blurry at full-screen; see standalone-match.js.) */
