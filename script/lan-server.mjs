@@ -464,7 +464,7 @@ wss.on("connection", (ws) => {
 
     // --- pad -> host: kickoff / rematch request (FIRST pad only, same guard
     //     as zoom so two phones can't race the kickoff) ---
-    if ((msg.t === "start" || msg.t === "rematch") && ws.__role === "pad") {
+    if ((msg.t === "start" || msg.t === "rematch" || msg.t === "pause") && ws.__role === "pad") {
       const pad = room.pads.get(ws.__padId);
       if (pad && pad.ws === ws && zoomControllerId(room) === pad.padId) {
         send(room.host, { t: msg.t });

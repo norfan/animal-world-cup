@@ -79,6 +79,22 @@ export function IconReplay(p) {
   );
 }
 
+export function IconPause(p) {
+  return (
+    <Svg {...p}>
+      <path d="M8.5 5.5v13M15.5 5.5v13" />
+    </Svg>
+  );
+}
+
+export function IconPlay(p) {
+  return (
+    <Svg {...p}>
+      <path d="M8 5.5v13l10-6.5Z" />
+    </Svg>
+  );
+}
+
 export function IconCheck(p) {
   return (
     <Svg {...p}>

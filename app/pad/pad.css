@@ -110,8 +110,8 @@
 }
 .pad-btn {
   position: absolute;
-  width: 34%;
-  height: 34%;
+  width: 29%;
+  height: 29%;
   border: none;
   border-radius: 50%;
   color: #fff;
@@ -123,10 +123,10 @@
   transition: transform 0.05s ease, filter 0.05s ease;
 }
 .pad-btn:active { transform: scale(0.9); filter: brightness(1.18); }
-.pad-btn--lob { left: 33%; top: 0; background: #5aa0e6; }
-.pad-btn--pass { left: 0; top: 33%; background: #58c06a; }
-.pad-btn--tackle { right: 0; top: 33%; background: #e0a23c; }
-.pad-btn--shoot { left: 33%; bottom: 0; background: #e2574c; }
+.pad-btn--lob { left: 37%; top: 0; background: #5aa0e6; }
+.pad-btn--pass { left: 0; top: 37%; background: #58c06a; }
+.pad-btn--tackle { right: 0; top: 37%; background: #e0a23c; }
+.pad-btn--shoot { left: 37%; bottom: 0; background: #e2574c; }
 .pad-zoom {
   position: fixed;
   left: 14px;
@@ -148,6 +148,7 @@
   touch-action: none;
 }
 .pad-zoom-btn:active { transform: scale(0.9); background: rgba(93, 144, 56, 0.85); }
+.pad-zoom-btn--pause { background: rgba(224, 162, 60, 0.9); }
 .pad-ctl {
   position: fixed;
   right: 14px;
@@ -176,8 +177,8 @@
 .pad-ctl-btn--kick { background: rgba(74, 158, 44, 0.9); }
 .pad-ctl-btn--rematch { background: rgba(224, 162, 60, 0.9); }
 .pad-btn--sprint {
-  left: 33%; top: 33%;
-  width: 34%; height: 34%;
+  left: 37%; top: 37%;
+  width: 26%; height: 26%;
   background: rgba(0, 0, 0, 0.42);
   border: 2px solid rgba(255, 255, 255, 0.3);
 }

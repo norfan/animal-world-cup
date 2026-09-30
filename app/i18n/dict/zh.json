@@ -81,6 +81,8 @@
   "match.rematch": "再来一局",
   "match.newmatch": "换队伍",
   "match.ctrl.zoomIn": "放大",
+  "match.ctrl.pause": "暂停",
+  "match.ctrl.resume": "继续",
   "match.ctrl.zoomOut": "缩小",
   "match.ctrl.resetZoom": "重置缩放",
   "match.ctrl.screenshot": "截图",

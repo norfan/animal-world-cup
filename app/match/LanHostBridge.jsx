@@ -181,6 +181,12 @@ export default function LanHostBridge() {
           return;
         }
 
+        if (msg.t === "pause") {
+          // 第一个手柄控制大屏暂停/继续（relay 已过滤为第一个 pad）
+          if (window.__matchPause) window.__matchPause.toggle();
+          return;
+        }
+
         if (msg.t === "zoom") {
           // 第一个手柄控制大屏相机缩放（relay 已过滤为第一个 pad）
           const d = Number(msg.d);

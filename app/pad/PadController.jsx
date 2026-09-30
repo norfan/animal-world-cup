@@ -33,6 +33,7 @@ const ZoomInIcon = () => <SVG s={24}><circle cx="12" cy="12" r="7.6" /><path d="
 const ZoomOutIcon = () => <SVG s={24}><circle cx="12" cy="12" r="7.6" /><path d="M8.8 12h6.4" /></SVG>;
 const KickIcon = () => <SVG s={26}><path d="M9 6.5v11l9-5.5z" /></SVG>;
 const ReplayIcon = () => <SVG s={26}><path d="M6.4 11.2a5.6 5.6 0 1 1 1.6 5.4M6.4 11.2V6.4" /><path d="M6.4 11.2h4.6" /></SVG>;
+const PauseIcon = () => <SVG s={24}><path d="M9 5.8v12.4M15 5.8v12.4" /></SVG>;
 
 const SIDE_CLS = { red: "pad--red", blue: "pad--blue" };
 const SIDE_LABEL = { red: "红队", blue: "蓝队" };
@@ -247,6 +248,10 @@ export default function PadController({ room, transport = "lan", requestedSlot =
   function sendRematch() {
     lanRef.current && lanRef.current.send({ t: "rematch" });
   }
+  // 暂停/继续：第一个手柄专用（服务端会过滤）
+  function sendPause() {
+    lanRef.current && lanRef.current.send({ t: "pause" });
+  }
 
   function stickDown(e) {
     const rect = baseRef.current.getBoundingClientRect();
@@ -361,6 +366,9 @@ export default function PadController({ room, transport = "lan", requestedSlot =
 
       {status === "playing" && zoomControl ? (
         <div className="pad-zoom" role="group" aria-label="缩放大屏画面">
+          <button type="button" className="pad-zoom-btn pad-zoom-btn--pause"
+                  onPointerDown={(e) => { e.preventDefault(); sendPause(); }}
+                  aria-label="暂停/继续"><PauseIcon /></button>
           <button type="button" className="pad-zoom-btn pad-zoom-btn--in"
                   onPointerDown={(e) => { e.preventDefault(); sendZoom(1.18); }}
                   aria-label="放大画面"><ZoomInIcon /></button>

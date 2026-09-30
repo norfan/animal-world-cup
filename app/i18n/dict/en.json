@@ -81,6 +81,8 @@
   "match.rematch": "Rematch",
   "match.newmatch": "New Match",
   "match.ctrl.zoomIn": "Zoom in",
+  "match.ctrl.pause": "Pause",
+  "match.ctrl.resume": "Resume",
   "match.ctrl.zoomOut": "Zoom out",
   "match.ctrl.resetZoom": "Reset zoom",
   "match.ctrl.screenshot": "Screenshot",

@@ -11,7 +11,7 @@ import GoalFx from "./GoalFx";
 import { StatsBars, readStats } from "./StatsPanel";
 import { captureMatch } from "./captureMatch";
 import { sfx } from "../audio/SoundBank";
-import { IconCamera, IconCheck, IconSoundOn, IconSoundOff, IconZoomIn, IconZoomOut, IconReplay, IconHome, IconTag } from "../ui/Icons";
+import { IconCamera, IconCheck, IconSoundOn, IconSoundOff, IconZoomIn, IconZoomOut, IconReplay, IconHome, IconTag, IconPause, IconPlay } from "../ui/Icons";
 
 function navigateHome() {
   window.location.href = "/";
@@ -99,6 +99,20 @@ function MatchControls({ result, onShot, shot }) {
   }, []);
   const z = (fn, arg) => () => { if (window.__matchZoom) window.__matchZoom[fn](arg); };
 
+  // Pause: engine owns the truth (window.__matchPaused), React mirrors it via
+  // the ab-pause-change event so the glass button can flip icon + tooltip.
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    const read = () => setPaused(!!window.__matchPaused);
+    read();
+    window.addEventListener("ab-pause-change", read);
+    return () => window.removeEventListener("ab-pause-change", read);
+  }, []);
+  function togglePause() {
+    sfx.play("ui_click");
+    if (window.__matchPause) window.__matchPause.toggle();
+  }
+
   const [soundOn, setSoundOn] = useState(!sfx.muted);
   function toggleSound() {
     const next = !soundOn;
@@ -135,6 +149,10 @@ function MatchControls({ result, onShot, shot }) {
         <>
           <button className="glass-btn" data-tip={t("match.ctrl.zoomIn")} onClick={z("step", 1.18)}><IconZoomIn /></button>
           <button className="glass-btn" data-tip={t("match.ctrl.zoomOut")} onClick={z("step", 1 / 1.18)}><IconZoomOut /></button>
+
+          <button type="button" className="glass-btn" data-tip={t(paused ? "match.ctrl.resume" : "match.ctrl.pause")} onClick={togglePause}>
+            {paused ? <IconPlay /> : <IconPause />}
+          </button>
 
           {seatCount > 0 ? (
             <button type="button" className="glass-btn" aria-pressed={labelsOn}
