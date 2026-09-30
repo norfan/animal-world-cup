@@ -130,7 +130,7 @@
 .pad-zoom {
   position: fixed;
   left: 14px;
-  top: 84px;
+  top: 34px;
   display: flex;
   flex-direction: column;
   gap: 10px;
