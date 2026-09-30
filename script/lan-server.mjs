@@ -156,6 +156,10 @@ function freeColor(room) {
  *     which reproduces the old "first pad = P1/red, second = P2/blue" behaviour.
  */
 function pickSide(room, requested) {
+  // 同队模式：所有连接手机统一分到 sameSide（忽略手机侧别请求）
+  if (room.teamMode === "same") {
+    return freeNumber(room, room.sameSide) >= 0 ? room.sameSide : null;
+  }
   const free = (s) => freeNumber(room, s) >= 0;
   if (SIDES.includes(requested)) return free(requested) ? requested : null;
   const open = SIDES.filter(free);
@@ -296,11 +300,14 @@ wss.on("connection", (ws) => {
         if (old && old !== ws) try { old.close(4000, "host-replaced"); } catch {}
       } else {
         code = code || makeCode();
-        room = { host: ws, pads: new Map(), held: new Map(), graceTimer: null, locked: false, squad: 6 };
+        room = { host: ws, pads: new Map(), held: new Map(), graceTimer: null, locked: false, squad: 6, teamMode: "split", sameSide: "red" };
         rooms.set(code, room);
       }
       const sq = Number(msg.squad);
       if (sq >= 2 && sq <= 6) room.squad = sq;
+      // 分配模式：split=自动分边（默认）；same=全部连接手机同一队
+      room.teamMode = msg.teamMode === "same" ? "same" : "split";
+      if (SIDES.includes(msg.sameSide)) room.sameSide = msg.sameSide;
       ws.__role = "host";
       ws.__room = code;
       send(ws, {
@@ -313,6 +320,8 @@ wss.on("connection", (ws) => {
         // seat model
         sides: SIDES,
         squad: room.squad,
+        teamMode: room.teamMode,
+        sameSide: room.sameSide,
         bindable: bindableFor(room),
         gkNumber: GK_NUMBER,
         humansPerSide: humansPerSide(room),
@@ -395,7 +404,9 @@ wss.on("connection", (ws) => {
       if (!bindNewSeat(room, pad, requestedSide)) {
         // "side-full" = the side you asked for is full but a seat exists elsewhere
         // (so retrying without `side` would work); "full" = nothing left anywhere.
-        const anyFree = SIDES.some((s) => freeNumber(room, s) >= 0);
+        const anyFree = room.teamMode === "same"
+          ? freeNumber(room, room.sameSide) >= 0
+          : SIDES.some((s) => freeNumber(room, s) >= 0);
         send(ws, { t: "joinErr", reason: anyFree ? "side-full" : "full" });
         return;
       }

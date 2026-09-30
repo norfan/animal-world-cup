@@ -29,7 +29,7 @@ function Portrait({ id }) {
   );
 }
 
-export default function LobbyClient({ red, blue, side, ai, time, squad }) {
+export default function LobbyClient({ red, blue, side, ai, time, squad, teamMode = "split", sameSide = "red" }) {
   const { t } = useLocale();
   const router = useRouter();
   const [room, setRoom] = useState(null);
@@ -66,7 +66,7 @@ export default function LobbyClient({ red, blue, side, ai, time, squad }) {
     });
     lanRef.current = lan;
     // no room yet -> the relay mints one and replies `hosted`
-    lan.setHello(() => ({ t: "host", room: "", squad: Number(squad) || 6 }));
+    lan.setHello(() => ({ t: "host", room: "", squad: Number(squad) || 6, teamMode, sameSide }));
     return () => lan.close();
   }, []);
 
@@ -82,7 +82,7 @@ export default function LobbyClient({ red, blue, side, ai, time, squad }) {
     // the relay's host grace timer keeps the room (and the phones) alive across
     // this navigation. Formations are left to the engine's random roll.
     lanRef.current && lanRef.current.send({ t: "start", info: { red, blue } });
-    const url = `/match?red=${red}&blue=${blue}&ai=${ai}&side=${side}&time=${time}&squad=${squad}&play=1&p2=1&lan=${room}`;
+    const url = `/match?red=${red}&blue=${blue}&ai=${ai}&side=${side}&time=${time}&squad=${squad}&teamMode=${teamMode}&sameSide=${sameSide}&play=1&p2=1&lan=${room}`;
     router.push(url);
   }
 
@@ -94,6 +94,11 @@ export default function LobbyClient({ red, blue, side, ai, time, squad }) {
       <div className="lb-wrap">
         <h1 className="lb-title">{t("lan.title")}</h1>
         <p className="lb-sub">{t("lan.sub")}</p>
+        {teamMode === "same" ? (
+          <p className="lb-note">{t("lan.teamMode.same").replace("{s}", t(`home.teamMode.${sameSide}`))}</p>
+        ) : (
+          <p className="lb-note">{t("lan.teamMode.split")}</p>
+        )}
 
         <div className="lb-cols">
           {/* left: scan-to-join */}

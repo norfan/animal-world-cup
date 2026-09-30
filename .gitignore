@@ -85,3 +85,6 @@ script/build-match-runtime-assets.mjs
 # Local debug scratch files (verification runs)
 /.scratch-*
 
+# Pre-edit safety backups of runtime/server files (engine + relay) — local only
+*.bak-*
+

@@ -15,5 +15,7 @@ export default async function LobbyPage({ searchParams }) {
   const ai = (sp.ai || "0").toString();
   const time = (sp.time || "20").toString();
   const squad = (sp.squad || "6").toString();
-  return <LobbyClient red={red} blue={blue} side={side} ai={ai} time={time} squad={squad} />;
+  const teamMode = (sp.teamMode === "same" ? "same" : "split").toString();
+  const sameSide = (sp.sameSide === "blue" ? "blue" : "red").toString();
+  return <LobbyClient red={red} blue={blue} side={side} ai={ai} time={time} squad={squad} teamMode={teamMode} sameSide={sameSide} />;
 }

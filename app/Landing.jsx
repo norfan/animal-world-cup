@@ -153,6 +153,8 @@ export default function Landing() {
   const [time, setTime] = useState(20); // full-match minutes (default: normal)
   const [squad, setSquad] = useState(6); // outfield players per side, GK excluded (2..6)
   const [side, setSide] = useState("home"); // your team's kit: home / away
+  const [teamMode, setTeamMode] = useState("split"); // LAN 联机分配：split 自动分边 / same 全部同队
+  const [sameSide, setSameSide] = useState("red"); // 同队模式的目标阵营（red / blue）
   const [onlineOpen, setOnlineOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
 
@@ -206,7 +208,7 @@ export default function Landing() {
   // screen hosts a room and phones join as gamepads. Two humans, no shared
   // keyboard — each plays from their own phone over the local network.
   function goLan() {
-    router.push(`/lobby?red=${mine}&blue=${opp}&ai=${diff}&side=${side}&time=${time}&squad=${squad}`);
+    router.push(`/lobby?red=${mine}&blue=${opp}&ai=${diff}&side=${side}&time=${time}&squad=${squad}&teamMode=${teamMode}&sameSide=${sameSide}`);
   }
 
   function goOnline(mode) {
@@ -293,6 +295,28 @@ export default function Landing() {
                   {n}v{n}
                 </button>
               ))}
+            </div>
+          </div>
+          <div className={css.setGroup}>
+            <span className={css.formLabel}>{t("home.teamMode")}</span>
+            <div className={css.pills}>
+              <button type="button"
+                      className={`${css.pill} ${teamMode === "split" ? css.pillOn : ""}`}
+                      onClick={() => setTeamMode("split")}>
+                {t("home.teamMode.split")}
+              </button>
+              <button type="button"
+                      className={`${css.pill} ${teamMode === "same" ? css.pillOn : ""}`}
+                      onClick={() => setTeamMode("same")}>
+                {t("home.teamMode.same")}
+              </button>
+              {teamMode === "same" ? ["red", "blue"].map((sd) => (
+                <button key={sd} type="button"
+                        className={`${css.pill} ${sameSide === sd ? css.pillOn : ""}`}
+                        onClick={() => setSameSide(sd)}>
+                  {t(`home.teamMode.${sd}`)}
+                </button>
+              )) : null}
             </div>
           </div>
         </div>
