@@ -120,6 +120,48 @@ pnpm build
 
 公网房间是邀请制休闲对战，目前不包含账号、自动匹配、排行榜或服务端防作弊。
 
+### 🖥 Windows 桌面版（局域网模式）打包
+
+桌面版把游戏打包为 Windows 原生应用（Electron），**默认按局域网模式启动**：启动后自动拉起网页服务（13000）和局域网中继（13001），手机连**同一个 Wi-Fi** 即可作为手柄接入——不需要公网、不需要部署 Cloudflare。
+
+**一键打包：**
+
+```bash
+pnpm package:win
+```
+
+流程：以 `NEXT_OUTPUT=standalone` 做生产构建 → 组装自包含运行目录（standalone 服务 + 静态资源 + LAN 中继 + 手柄 APK 下载入口）→ electron-packager 生成 Windows 应用 → 压缩为 zip。
+
+**产物：**
+
+| 路径 | 说明 |
+| --- | --- |
+| `dist/animal-cup-win32-x64.zip` | 分发用压缩包（约 216 MB） |
+| `dist/AnimalCup-win32-x64/AnimalCup.exe` | 解压后直接运行的可执行文件 |
+
+**运行与手机接入：**
+
+1. 解压 zip，双击 `AnimalCup.exe`（启动时自动预清理 13000/13001 端口残留，约 1 秒内就绪）；
+2. 手机连接**同一个路由器 Wi-Fi**，浏览器或手柄 APK 访问 `http://<电脑局域网IP>:13000/pad`（大屏 `/lobby` 会显示带正确 IP 的二维码与房间码）；
+3. 局域网 IP 自动检测：只挑真实上网网卡，自动跳过 VMware / Hyper-V / WSL 等虚拟网卡。多网卡机器若检测结果不对，可用环境变量强制指定：`LAN_IP=192.168.1.223 pnpm package:win`（打包时写死）或运行时设置 `LAN_IP`。
+
+**常见问题：**
+
+- **手机连不上**：先管理员运行 `dist/fix-firewall.bat`（放行 13000/13001 入站）；再确认手机与电脑在同一网段（同一路由器 Wi-Fi）；最后确认访问的是真实网卡 IP（如 `192.168.1.x`），而非 VMware 等虚拟网卡 IP（如 `192.168.30.1`）。
+- **只改了 `script/lan-server.mjs`、`electron/main.cjs` 想快速重打包**：跳过 Next 构建，只重组装与打包：
+  ```bash
+  SKIP_NEXT_BUILD=1 pnpm package:win
+  ```
+- **全新环境安装依赖**：非管理员账户下 pnpm 默认符号链接安装会失败，必须用扁平安装 + 国内镜像：
+  ```bash
+  pnpm install --node-linker=hoisted --registry=https://registry.npmmirror.com
+  ```
+  如需国内镜像下载 electron 二进制：
+  ```powershell
+  $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
+  ```
+- standalone 输出默认关闭（不影响 Cloudflare 部署构建），仅 `package:win` 打包时以 `NEXT_OUTPUT=standalone` 启用。
+
 ### 🛠 常用脚本
 
 | 命令 | 说明 |
@@ -143,6 +185,7 @@ pnpm build
 | `pnpm inspect:match <模块名>` | 把预构建引擎包按模块打印出来（支持 `--grep`），用于溯源引擎行为 |
 | `pnpm deploy:online` | 部署 Cloudflare Durable Object 房间服务 |
 | `pnpm build` | 生产构建 |
+| `pnpm package:win` | 打包 Windows 桌面版（局域网模式，standalone 构建 → Electron 打包 → zip） |
 | `pnpm build:worker` | 构建 Cloudflare Workers 版本 |
 | `pnpm start` | 运行生产构建 |
 
@@ -297,6 +340,65 @@ Local development uses ports `13000` and `13002`. For production:
 Public rooms are intended for invite-only casual play. Accounts, automatic
 matchmaking, rankings, and server-side anti-cheat are not included.
 
+### 🖥 Windows Desktop Build (LAN Mode)
+
+The desktop build packages the game as a native Windows app (Electron) that
+**starts in LAN mode by default**: it launches the web server (13000) and the
+LAN relay (13001) on startup, and phones on the **same Wi-Fi** join as wireless
+gamepads — no public internet, no Cloudflare deployment needed.
+
+**One-command packaging:**
+
+```bash
+pnpm package:win
+```
+
+Pipeline: production build with `NEXT_OUTPUT=standalone` → assemble a
+self-contained run directory (standalone server + static assets + LAN relay +
+gamepad APK download) → electron-packager to a Windows app → compress to zip.
+
+**Artifacts:**
+
+| Path | Description |
+| --- | --- |
+| `dist/animal-cup-win32-x64.zip` | Distribution archive (~216 MB) |
+| `dist/AnimalCup-win32-x64/AnimalCup.exe` | Executable; run after unzipping |
+
+**Run & phone pairing:**
+
+1. Unzip, then double-click `AnimalCup.exe` (it reclaims stale listeners on
+   13000/13001 at startup and is ready in about a second);
+2. Connect the phone to the **same router Wi-Fi**, then open
+   `http://<PC-LAN-IP>:13000/pad` in the phone browser or the gamepad APK (the
+   big screen's `/lobby` shows a QR code and room code with the correct IP);
+3. The LAN IP is auto-detected from the real uplink adapter only — virtual
+   adapters (VMware / Hyper-V / WSL) are skipped. On multi-NIC machines, force
+   it with an env var: `LAN_IP=192.168.1.223 pnpm package:win` (baked at
+   packaging time) or set `LAN_IP` at runtime.
+
+**Troubleshooting:**
+
+- **Phone cannot connect**: first run `dist/fix-firewall.bat` as Administrator
+  (opens inbound 13000/13001); then confirm the phone and PC share one subnet
+  (same router Wi-Fi); finally confirm the address is the real NIC IP
+  (e.g. `192.168.1.x`), not a virtual one (e.g. `192.168.30.1` from VMware).
+- **Quick repackage after touching only `script/lan-server.mjs` or
+  `electron/main.cjs`** (skip the Next build, just re-assemble and pack):
+  ```bash
+  SKIP_NEXT_BUILD=1 pnpm package:win
+  ```
+- **Fresh install on this machine**: the default pnpm symlink install fails for
+  non-admin accounts — use a flattened install with a mirror registry:
+  ```bash
+  pnpm install --node-linker=hoisted --registry=https://registry.npmmirror.com
+  ```
+  To download the electron binary from a mirror if needed:
+  ```powershell
+  $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
+  ```
+- Standalone output stays off by default (so Cloudflare builds are unaffected);
+  it is enabled only when `package:win` runs, via `NEXT_OUTPUT=standalone`.
+
 ### 🛠 Scripts
 
 | Command | Description |
@@ -320,6 +422,7 @@ matchmaking, rankings, and server-side anti-cheat are not included.
 | `pnpm inspect:match <module>` | Print modules out of the pre-built engine bundle (`--list`, `--grep`) |
 | `pnpm deploy:online` | Deploy the Durable Object room service |
 | `pnpm build` | Production build |
+| `pnpm package:win` | Build the Windows desktop app (LAN mode; standalone build → Electron pack → zip) |
 | `pnpm build:worker` | Build for Cloudflare Workers |
 | `pnpm start` | Run the production build |
 
