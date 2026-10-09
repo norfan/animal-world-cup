@@ -79,8 +79,11 @@ const PAD_COLORS = [
 //   - 10.*                 -> weight 2  (private)
 //   - 172.16-31.*          -> weight 1  (Docker/VM — weakest)
 //   - anything else        -> skipped
-// Higher weight wins; ties keep interface iteration order. Set LAN_IP to force
-// a specific address (handy if auto-detection ever picks a wrong adapter).
+// Higher weight wins; ties keep interface iteration order. Virtual adapters
+// (VMware VMnet*, Hyper-V vEthernet, WSL, Bluetooth PAN…) are skipped outright —
+// they never carry the phone's route, and picking one breaks phone access.
+// Set LAN_IP to force a specific address (handy if auto-detection ever picks
+// a wrong adapter).
 function lanIP() {
   if (process.env.LAN_IP) return process.env.LAN_IP;
   const ifaces = os.networkInterfaces();
@@ -89,6 +92,9 @@ function lanIP() {
     for (const ni of ifaces[name] || []) {
       if (ni.family !== "IPv4" || ni.internal) continue;
       const a = ni.address;
+      // Skip virtual / point-to-point adapters that phones can never route to.
+      const ifaceName = String(name).toLowerCase();
+      if (/(vmware|vmnet|virtual|hyper|wsl|vethernet|loopback|bluetooth|docker|veth|tap|tun|virtualbox)/.test(ifaceName)) continue;
       let w = 0;
       if (/^192\.168\./.test(a)) w = 3;
       else if (/^10\./.test(a)) w = 2;

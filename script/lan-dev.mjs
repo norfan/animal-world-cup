@@ -13,24 +13,29 @@ const require = createRequire(import.meta.url);
 const nextBin = require.resolve("next/dist/bin/next");
 
 // Best-guess LAN IPv4 (matches the relay's heuristic): prefer 192.168.* and
-// 10.* over the 172.16/12 block that Docker/Hyper-V/WSL usually occupy. Set
-// LAN_IP to force a specific address if auto-detection ever picks wrong.
+// 10.* over the 172.16/12 block that Docker/Hyper-V/WSL usually occupy. Virtual
+// adapters (VMware VMnet*, Hyper-V vEthernet, WSL, Bluetooth PAN…) are skipped
+// outright — they never carry the phone's route. Set LAN_IP to force a specific
+// address if auto-detection ever picks wrong.
 function lanIP() {
   if (process.env.LAN_IP) return process.env.LAN_IP;
   const ifaces = os.networkInterfaces();
   for (const name of Object.keys(ifaces)) {
     for (const ni of ifaces[name] || []) {
-      if (ni.family === "IPv4" && !ni.internal && /^192\.168\./.test(ni.address)) return ni.address;
+      if (ni.family === "IPv4" && !ni.internal && /^192\.168\./.test(ni.address)
+          && !/(vmware|vmnet|virtual|hyper|wsl|vethernet|loopback|bluetooth|docker|veth|tap|tun|virtualbox)/i.test(name)) return ni.address;
     }
   }
   for (const name of Object.keys(ifaces)) {
     for (const ni of ifaces[name] || []) {
-      if (ni.family === "IPv4" && !ni.internal && /^10\./.test(ni.address)) return ni.address;
+      if (ni.family === "IPv4" && !ni.internal && /^10\./.test(ni.address)
+          && !/(vmware|vmnet|virtual|hyper|wsl|vethernet|loopback|bluetooth|docker|veth|tap|tun|virtualbox)/i.test(name)) return ni.address;
     }
   }
   for (const name of Object.keys(ifaces)) {
     for (const ni of ifaces[name] || []) {
-      if (ni.family === "IPv4" && !ni.internal && /^172\.(1[6-9]|2\d|3[01])\./.test(ni.address)) return ni.address;
+      if (ni.family === "IPv4" && !ni.internal && /^172\.(1[6-9]|2\d|3[01])\./.test(ni.address)
+          && !/(vmware|vmnet|virtual|hyper|wsl|vethernet|loopback|bluetooth|docker|veth|tap|tun|virtualbox)/i.test(name)) return ni.address;
     }
   }
   return "localhost";
