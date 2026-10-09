@@ -7,7 +7,9 @@ allowBuilds:
   sharp: true
   esbuild: true
   workerd: true
+  electron: true
 onlyBuiltDependencies:
   - sharp
   - esbuild
   - workerd
+  - electron

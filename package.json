@@ -17,6 +17,7 @@
     "build": "node script/stamp-sw-version.mjs && node script/safe-build.mjs",
     "build:worker": "node script/rmrf.mjs .next .open-next && node script/stamp-sw-version.mjs && opennextjs-cloudflare build",
     "start": "next start -p 13000",
+    "package:win": "node build/package-win.mjs",
     "test:pads": "node script/verify-pad-driver.mjs",
     "inspect:match": "node script/inspect-match-module.mjs",
     "test:lan:seats": "node script/verify-lan-seats.mjs",
@@ -36,8 +37,10 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250109.0",
+    "@electron/packager": "^20.3.0",
     "@opennextjs/cloudflare": "^1.19.10",
     "@types/react": "19.2.17",
+    "electron": "44.7.0",
     "playwright-core": "^1.61.1",
     "sharp": "^0.34.5",
     "typescript": "5.8.2",
